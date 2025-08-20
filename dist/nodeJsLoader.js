@@ -5,15 +5,7 @@ import path from "node:path";
 import { isFile, searchSourceOf } from "./tools.js";
 import { supportedExtensions } from "./rules.js";
 import { transformFile } from "./transform.js";
-// Guard to avoid recursive self-registration when using Module.register(import.meta.url)
-const __JOPI_LOADER_REGISTERED__ = Symbol.for('jopi-loader:registered');
-const __g = globalThis;
-if (!__g[__JOPI_LOADER_REGISTERED__]) {
-    __g[__JOPI_LOADER_REGISTERED__] = true;
-    // "register" allow async.
-    NodeModule.register(import.meta.url);
-}
-export async function resolve(specifier, context, nextResolve) {
+export async function doNodeJsResolve(specifier, context, nextResolve) {
     async function tryResolveFile(filePath, moduleName) {
         if (await isFile(filePath)) {
             return nextResolve(moduleName, context);
@@ -69,7 +61,7 @@ export async function resolve(specifier, context, nextResolve) {
     }
 }
 // noinspection JSUnusedGlobalSymbols
-export async function load(url, context, nextLoad) {
+export async function doNodeJsLoad(url, context, nextLoad) {
     if (context.format === "jopi-loader") {
         let idx = url.indexOf("?");
         let options = "";

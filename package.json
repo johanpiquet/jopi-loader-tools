@@ -17,6 +17,10 @@
     "bun-publish": "bun publish"
   },
 
+  "publishConfig": {
+    "access": "public"
+  },
+
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "latest",

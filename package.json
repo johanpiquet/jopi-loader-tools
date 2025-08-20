@@ -8,8 +8,8 @@
     "bun": "^1.2.18",
     "node": ">=22.18.0"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
 
   "scripts": {

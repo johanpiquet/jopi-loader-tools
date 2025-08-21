@@ -1,3 +1,4 @@
+import "jopi-node-space";
 export declare function getFileStat(filePath: string): Promise<import("fs").Stats | undefined>;
 export declare function isFile(filePath: string): Promise<boolean>;
 /**

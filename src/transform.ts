@@ -3,6 +3,8 @@ import {supportedExtensionToType} from "./rules.ts";
 import path from "node:path";
 import fs from "node:fs/promises";
 
+import "jopi-node-space";
+
 const nFS = NodeSpace.fs;
 
 export interface TransformResult {

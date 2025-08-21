@@ -1,5 +1,3 @@
-import * as NodeModule from 'node:module';
-
 import "jopi-node-space";
 import {fileURLToPath} from "node:url";
 import path from "node:path";

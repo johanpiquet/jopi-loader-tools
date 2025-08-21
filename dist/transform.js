@@ -2,6 +2,7 @@ import cssModuleCompiler from "./cssModuleCompiler.js";
 import { supportedExtensionToType } from "./rules.js";
 import path from "node:path";
 import fs from "node:fs/promises";
+import "jopi-node-space";
 const nFS = NodeSpace.fs;
 export async function transformFile(filePath, options) {
     let text;

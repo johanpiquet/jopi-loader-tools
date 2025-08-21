@@ -1,3 +1,4 @@
+import "jopi-node-space";
 export interface TransformResult {
     text: string;
     type: "js" | "text";

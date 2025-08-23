@@ -88,13 +88,19 @@ export async function doNodeJsLoad(url: string, context: any, nextLoad: any) {
             filePath = await searchSourceOf(filePath);
         }
 
-        let res = await transformFile(filePath, options);
+        try {
+            let res = await transformFile(filePath, options);
 
-        return {
-            source: res.text,
-            format: 'module',
-            shortCircuit: true
-        };
+            return {
+                source: res.text,
+                format: 'module',
+                shortCircuit: true
+            };
+        }
+        catch (e: any) {
+            console.warn("jopi-loader - Error while loading:", e?.message || e);
+            throw "jopi-loader - error";
+        }
     }
 
     return nextLoad(url, context);

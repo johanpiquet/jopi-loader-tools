@@ -30,7 +30,8 @@
     "jopi-node-space": "workspace: *",
     "postcss": "^8.5.6",
     "postcss-modules": "^6.0.1",
-    "sass": "^1.90.0"
+    "sass": "^1.90.0",
+    "ws": "^8.18.3"
   },
   "nodeSwitch": true,
   "nodeSwitch-default": "node"

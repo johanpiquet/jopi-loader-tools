@@ -1,10 +1,11 @@
 import path from "node:path";
 import fs from "node:fs";
 import SourceChangesWatcher from "./sourceChangesWatcher.js";
+import { WebSocketServer } from 'ws';
 
 const nFS = NodeSpace.fs;
 
-const FORCE_LOG = false;
+const FORCE_LOG = true;
 const FORCE_LOG_BUN = true;
 
 enum WATCH_MODE { NONE, SOURCES }
@@ -155,7 +156,16 @@ export async function jopiLauncherTool(jsEngine: string) {
     let watchInfos = await getWatchInfos();
     let mustWatch = watchInfos.mode !== WATCH_MODE.NONE;
 
-    if (mustWatch) env["JOPI_IS_WATCHING"] = "sources";
+    if (mustWatch) {
+        env["JOPIN_SOURCE_WATCHING_ENABLED"] = "1";
+
+        let wsUrl = await startWebSocket();
+
+        if (wsUrl) {
+            env["JOPIN_BROWSER_REFRESH_ENABLED"] = "1";
+            env["JOPIN_WEBSOCKET_URL"] = wsUrl;
+        }
+    }
 
     const watcher = new SourceChangesWatcher({
         cmd, env, args,
@@ -169,7 +179,6 @@ export async function jopiLauncherTool(jsEngine: string) {
         watcher.spawnChild().catch(console.error);
     }
 }
-
 
 /**
  * Transform an absolute path to a relative path.
@@ -317,6 +326,24 @@ function findModuleDir(moduleName: string): string|null {
     }
 
     return null;
+}
+
+async function startWebSocket(): Promise<string|undefined> {
+    for (let port=100;port<6000;port++) {
+        try {
+            const wss = new WebSocketServer({port});
+            wss.on('connection', onWebSocketConnection);
+            return "ws://127.0.0.1:" + port
+        }
+        catch {
+        }
+    }
+
+    return undefined;
+}
+
+function onWebSocketConnection(ws: WebSocket) {
+    console.log("Client connected to web-socket");
 }
 
 let gPackageJsonPath: string|null|undefined;

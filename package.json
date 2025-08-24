@@ -11,31 +11,27 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
-
   "scripts": {
     "tsc": "npx tsc",
     "bun-publish": "bun publish"
   },
-
   "publishConfig": {
     "access": "public"
   },
-
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "latest",
     "@types/sass": "latest",
     "@jopi-loader/types": "workspace: *"
   },
-
   "dependencies": {
+    "chokidar": "^4.0.3",
     "esbuild": "^0.25.9",
     "jopi-node-space": "workspace: *",
     "postcss": "^8.5.6",
     "postcss-modules": "^6.0.1",
     "sass": "^1.90.0"
   },
-
   "nodeSwitch": true,
   "nodeSwitch-default": "node"
 }

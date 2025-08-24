@@ -1,8 +1,15 @@
 import path from "node:path";
 import fs from "node:fs";
-import { spawn } from "node:child_process";
+import SourceChangesWatcher from "./sourceChangesWatcher.js";
+const nFS = NodeSpace.fs;
 const FORCE_LOG = false;
-export function jopiLauncherTool(jsEngine) {
+const FORCE_LOG_BUN = true;
+var WATCH_MODE;
+(function (WATCH_MODE) {
+    WATCH_MODE[WATCH_MODE["NONE"] = 0] = "NONE";
+    WATCH_MODE[WATCH_MODE["SOURCES"] = 1] = "SOURCES";
+})(WATCH_MODE || (WATCH_MODE = {}));
+export async function jopiLauncherTool(jsEngine) {
     function addKnownPackages(toPreload, toSearch) {
         if (!toSearch)
             return;
@@ -35,55 +42,108 @@ export function jopiLauncherTool(jsEngine) {
             return [];
         }
     }
-    function run() {
-        // Here first is node.js, second is jopi. (it's du to shebang usage).
-        const argv = process.argv.slice(2);
-        let toPreload = getPreloadModules();
-        toPreload = ["jopi-loader", ...toPreload];
-        let preloadArgs = [];
-        // We need the absolute path.
-        toPreload.forEach(pkg => {
-            const pkgPath = findModuleDir(pkg);
-            if (!pkgPath)
-                return;
-            let foundPath = getRelativePath(findModuleEntryPoint(pkgPath));
-            if (isWin32)
-                foundPath = convertWin32ToLinuxPath(foundPath);
-            if (foundPath) {
-                preloadArgs.push(importFlag);
-                preloadArgs.push(foundPath);
+    async function getWatchInfos() {
+        let res = { mode: isDevMode ? WATCH_MODE.SOURCES : WATCH_MODE.NONE, dirToWatch: [] };
+        let pckJson = findPackageJson();
+        if (pckJson) {
+            try {
+                let json = JSON.parse(await nFS.readTextFromFile(pckJson));
+                let watchDirEntry = json.watchDirs;
+                if (!watchDirEntry)
+                    watchDirEntry = json["watch-dirs"];
+                if (!watchDirEntry)
+                    watchDirEntry = json["watch"];
+                if (watchDirEntry) {
+                    if (watchDirEntry === true) {
+                        res.mode = WATCH_MODE.SOURCES;
+                    }
+                    else if (watchDirEntry === false) {
+                        res.mode = WATCH_MODE.NONE;
+                    }
+                    else if (watchDirEntry instanceof Array) {
+                        for (let value of watchDirEntry) {
+                            if (typeof (value) === "string") {
+                                res.dirToWatch.push(path.resolve(value));
+                            }
+                        }
+                    }
+                }
             }
-        });
-        let cmd = findExecutable(jsEngine, jsEngine);
-        if (mustLog)
-            console.log("Jopi - Using " + jsEngine + " from:", cmd);
-        let args = [...preloadArgs, ...argv];
-        const cwd = process.cwd();
-        if (mustLog)
-            console.log("Use current working dir:", cwd);
-        if (mustLog)
-            console.log("Jopi - Executing:", cmd, ...args);
-        let useShell = cmd.endsWith('.cmd') || cmd.endsWith('.bat') || cmd.endsWith('.sh');
-        const child = spawn(cmd, args, { stdio: 'inherit', cwd, shell: useShell });
-        child.on('exit', (code, signal) => {
-            if (signal)
-                process.kill(process.pid, signal);
-            else
-                process.exit(code ?? 0);
-        });
-        child.on('error', (err) => {
-            console.error(err.message || String(err));
-            process.exit(1);
-        });
+            catch (e) {
+                console.error(e);
+            }
+            let srcDir = path.join(path.dirname(pckJson), "src");
+            if (await nFS.isDirectory(srcDir)) {
+                res.dirToWatch.push(srcDir);
+            }
+        }
+        let watch = process.env.WATCH;
+        if (watch) {
+            switch (watch) {
+                case "0":
+                case "false":
+                case "no":
+                    break;
+                case "1":
+                case "true":
+                case "yes":
+                    res.mode = WATCH_MODE.SOURCES;
+                    break;
+            }
+        }
+        return res;
     }
     const VERSION = "v1.1.1";
-    const mustLog = process.env.JOPI_LOG || FORCE_LOG;
+    const mustLog = process.env.JOPI_LOG || FORCE_LOG || (FORCE_LOG_BUN && (jsEngine === "bun"));
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
     const isWin32 = path.sep === '\\';
+    let isDevMode = process.env.NODE_ENV !== 'production';
     if (mustLog)
         console.log("Jopi version:", VERSION);
     const knowPackagesToPreload = ["jopi-rewrite"];
-    run();
+    // Here first is node.js, second is jopi. (it's du to shebang usage).
+    const argv = process.argv.slice(2);
+    let toPreload = getPreloadModules();
+    toPreload = ["jopi-loader", ...toPreload];
+    let preloadArgs = [];
+    // We need the absolute path.
+    toPreload.forEach(pkg => {
+        const pkgPath = findModuleDir(pkg);
+        if (!pkgPath)
+            return;
+        let foundPath = getRelativePath(findModuleEntryPoint(pkgPath));
+        if (isWin32)
+            foundPath = convertWin32ToLinuxPath(foundPath);
+        if (foundPath) {
+            preloadArgs.push(importFlag);
+            preloadArgs.push(foundPath);
+        }
+    });
+    let cmd = findExecutable(jsEngine, jsEngine);
+    if (mustLog)
+        console.log("Jopi - Using " + jsEngine + " from:", cmd);
+    let args = [...preloadArgs, ...argv];
+    const cwd = process.cwd();
+    if (mustLog)
+        console.log("Use current working dir:", cwd);
+    if (mustLog)
+        console.log("Jopi - Executing:", cmd, ...args);
+    let env = { ...process.env };
+    let watchInfos = await getWatchInfos();
+    let mustWatch = watchInfos.mode !== WATCH_MODE.NONE;
+    if (mustWatch)
+        env["JOPI_IS_WATCHING"] = "sources";
+    const watcher = new SourceChangesWatcher({
+        cmd, env, args,
+        watchDirs: watchInfos.dirToWatch,
+    });
+    if (mustWatch) {
+        NodeSpace.term.logBgBlue("Source watching enabled");
+        watcher.start().catch(console.error);
+    }
+    else {
+        watcher.spawnChild().catch(console.error);
+    }
 }
 /**
  * Transform an absolute path to a relative path.

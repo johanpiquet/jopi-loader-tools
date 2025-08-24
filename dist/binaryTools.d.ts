@@ -1,1 +1,1 @@
-export declare function jopiLauncherTool(jsEngine: string): void;
+export declare function jopiLauncherTool(jsEngine: string): Promise<void>;

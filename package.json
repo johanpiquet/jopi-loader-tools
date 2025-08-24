@@ -12,7 +12,7 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
-    "tscgo": "npx tsgo",
+    "build": "npx tsgo",
     "tsc": "npx tsc",
 
     "bun-publish": "bun publish"

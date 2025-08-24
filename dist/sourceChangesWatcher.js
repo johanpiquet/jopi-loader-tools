@@ -19,6 +19,7 @@ export class SourceChangesWatcher {
     _cmd;
     _args;
     _timerId = 0;
+    _isDev;
     constructor(params) {
         this.watchDirs = params.watchDirs;
         if (params.env)
@@ -27,6 +28,7 @@ export class SourceChangesWatcher {
             this.env = process.env;
         this._cmd = params.cmd || process.argv0;
         this._args = params.args || [];
+        this._isDev = params.isDev;
     }
     async start() {
         if (this._isStarted)
@@ -36,7 +38,7 @@ export class SourceChangesWatcher {
             await this.watchDirectoryRecursive(dir);
         }
         // Create the first child.
-        await this.spawnChild();
+        await this.spawnChild(true);
     }
     async askToRestart(filePath) {
         // Avoid it if inside a hidden directory (start by .).
@@ -90,22 +92,45 @@ export class SourceChangesWatcher {
         watcher.on('error', () => {
         });
     }
-    async spawnChild() {
+    killAll() {
+        if (this._isDev) {
+            // > Do a fast hard kill.
+            if (gChild && !gChild.killed)
+                gChild.kill('SIGKILL');
+            process.exit(0);
+        }
+        else {
+            // > Do a soft kill.
+            if (gChild) {
+                const child = gChild;
+                child.kill('SIGTERM');
+                setTimeout(() => {
+                    if (!child.killed) {
+                        child.kill('SIGKILL');
+                    }
+                }, 3000);
+            }
+        }
+    }
+    async spawnChild(ignoreSpawnEvent = false) {
         if (gChild) {
-            cleanListeners();
-            killChild();
-            gChild.kill();
+            if (!gChild.killed) {
+                // Do a hard kill.
+                // Not a problem since we are in dev mode.
+                gChild.kill("SIGKILL");
+            }
             gChild = undefined;
             await NodeSpace.timer.tick(100);
         }
         let useShell = this._cmd.endsWith('.cmd') || this._cmd.endsWith('.bat') || this._cmd.endsWith('.sh');
-        process.on('SIGTERM', killChild);
-        process.on('SIGINT', killChild);
-        process.on('SIGHUP', killChild);
-        process.on('exit', killChild);
+        process.on('SIGTERM', () => this.killAll());
+        process.on('SIGINT', () => this.killAll());
+        process.on('SIGHUP', () => this.killAll());
+        process.on('exit', () => this.killAll());
         const child = spawn(this._cmd, this._args, {
             stdio: "inherit", shell: useShell,
-            cwd: process.cwd(), env: this.env
+            cwd: process.cwd(),
+            env: this.env
         });
         gChild = child;
         child.on('exit', (code, signal) => {
@@ -124,26 +149,15 @@ export class SourceChangesWatcher {
                 process.exit(1);
             }
         });
+        if (!ignoreSpawnEvent) {
+            child.on("spawn", () => {
+                this.onSpawned();
+            });
+        }
+    }
+    onSpawned() {
+        // To override.
     }
 }
 let gChild;
-const killChild = () => {
-    if (!gChild)
-        return;
-    const child = gChild;
-    if (!child.killed) {
-        child.kill('SIGTERM');
-        setTimeout(() => {
-            if (!child.killed)
-                child.kill('SIGKILL');
-        }, 1000);
-    }
-};
-function cleanListeners() {
-    process.removeListener('SIGTERM', killChild);
-    process.removeListener('SIGINT', killChild);
-    process.removeListener('SIGHUP', killChild);
-    process.removeListener('exit', killChild);
-}
-export default SourceChangesWatcher;
 //# sourceMappingURL=sourceChangesWatcher.js.map

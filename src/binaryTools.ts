@@ -1,11 +1,11 @@
 import path from "node:path";
 import fs from "node:fs";
-import SourceChangesWatcher from "./sourceChangesWatcher.js";
-import { WebSocketServer } from 'ws';
+import {SourceChangesWatcher} from "./sourceChangesWatcher.ts";
+import { WebSocketServer, WebSocket } from 'ws';
 
 const nFS = NodeSpace.fs;
 
-const FORCE_LOG = true;
+const FORCE_LOG = false;
 const FORCE_LOG_BUN = true;
 
 enum WATCH_MODE { NONE, SOURCES }
@@ -168,15 +168,19 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     const watcher = new SourceChangesWatcher({
-        cmd, env, args,
+        cmd, env, args, isDev: isDevMode,
         watchDirs: watchInfos.dirToWatch,
     });
+
+    watcher.onSpawned = () => {
+        wsAskRefresh();
+    }
 
     if (mustWatch) {
         NodeSpace.term.logBgBlue("Source watching enabled");
         watcher.start().catch(console.error);
     } else {
-        watcher.spawnChild().catch(console.error);
+        watcher.spawnChild(true).catch(console.error);
     }
 }
 
@@ -328,14 +332,33 @@ function findModuleDir(moduleName: string): string|null {
     return null;
 }
 
+function tryOpenWS(port: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const wss = new WebSocketServer({port});
+
+        wss.on('connection', ws => {
+            onWebSocketConnection(ws);
+        });
+
+        wss.on("listening", ()=>{
+            resolve()
+        });
+
+        wss.on('error', (e)=>{
+            reject(e);
+        });
+    });
+}
+
 async function startWebSocket(): Promise<string|undefined> {
-    for (let port=100;port<6000;port++) {
+    for (let port=5100;port<5400;port++) {
         try {
-            const wss = new WebSocketServer({port});
-            wss.on('connection', onWebSocketConnection);
+            await tryOpenWS(port);
+            console.log("Port accepted: " + port);
             return "ws://127.0.0.1:" + port
         }
-        catch {
+        catch(_e) {
+            console.log("Port", port, "is ko");
         }
     }
 
@@ -344,6 +367,19 @@ async function startWebSocket(): Promise<string|undefined> {
 
 function onWebSocketConnection(ws: WebSocket) {
     console.log("Client connected to web-socket");
+    gWebSockets.push(ws);
+
+    ws.onclose = (e) => {
+        let idx = gWebSockets.indexOf(e.target);
+        gWebSockets.splice(idx, 1);
+    }
 }
 
+function wsAskRefresh() {
+    gWebSockets.forEach(ws => {
+        ws.send("browser-refresh-asked");
+    })
+}
+
+const gWebSockets: WebSocket[] = [];
 let gPackageJsonPath: string|null|undefined;

@@ -4,6 +4,7 @@ export interface SourceChangesWatcherParams {
     env?: Record<string, string>;
     cmd?: string;
     args?: string[];
+    isDev: boolean;
 }
 /**
  * Watches source directories for changes and restarts a server process automatically.
@@ -22,10 +23,12 @@ export declare class SourceChangesWatcher {
     private readonly _cmd;
     private readonly _args;
     private _timerId;
+    private readonly _isDev;
     constructor(params: SourceChangesWatcherParams);
     start(): Promise<void>;
     private askToRestart;
     private watchDirectoryRecursive;
-    spawnChild(): Promise<void>;
+    private killAll;
+    spawnChild(ignoreSpawnEvent?: boolean): Promise<void>;
+    onSpawned(): void;
 }
-export default SourceChangesWatcher;

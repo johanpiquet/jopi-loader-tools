@@ -173,7 +173,13 @@ export async function jopiLauncherTool(jsEngine: string) {
     });
 
     watcher.onSpawned = () => {
-        wsAskRefresh();
+        // If gMustWaitServerReady is set, this means the server
+        // will send us a signal once ready. Without that we refresh
+        // once the server is created.
+
+        if (!gMustWaitServerReady) {
+            setTimeout(wsAskRefreshBrowser, 100);
+        }
     }
 
     if (mustWatch) {
@@ -354,7 +360,7 @@ async function startWebSocket(): Promise<string|undefined> {
     for (let port=5100;port<5400;port++) {
         try {
             await tryOpenWS(port);
-            console.log("Port accepted: " + port);
+            //console.log("Port accepted: " + port);
             return "ws://127.0.0.1:" + port
         }
         catch(_e) {
@@ -366,16 +372,33 @@ async function startWebSocket(): Promise<string|undefined> {
 }
 
 function onWebSocketConnection(ws: WebSocket) {
-    console.log("Client connected to web-socket");
+    //console.log("Client connected to web-socket");
     gWebSockets.push(ws);
 
     ws.onclose = (e) => {
         let idx = gWebSockets.indexOf(e.target);
         gWebSockets.splice(idx, 1);
     }
+
+    ws.onmessage = (e) => {
+        const msg = e.data;
+        //console.log("jopin message received: ", msg);
+
+        switch (msg) {
+            case "mustWaitServerReady":
+                gMustWaitServerReady = true;
+                break;
+            case "askRefreshingBrowser":
+                wsAskRefreshBrowser();
+                break;
+            case "declareServerReady":
+                wsAskRefreshBrowser();
+                break;
+        }
+    };
 }
 
-function wsAskRefresh() {
+function wsAskRefreshBrowser() {
     gWebSockets.forEach(ws => {
         ws.send("browser-refresh-asked");
     })
@@ -383,3 +406,4 @@ function wsAskRefresh() {
 
 const gWebSockets: WebSocket[] = [];
 let gPackageJsonPath: string|null|undefined;
+let gMustWaitServerReady: boolean = false;

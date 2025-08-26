@@ -1,6 +1,6 @@
 {
   "name": "@jopi-loader/tools",
-  "version": "1.0.11",
+  "version": "1.1.2",
   "private": false,
   "license": "MIT",
   "description": "Tools for jopi-loader",
@@ -15,7 +15,7 @@
     "build": "npx tsgo",
     "tsc": "npx tsc",
 
-    "bun-publish": "bun publish"
+    "bun-publish": "npx tsc && bun publish"
   },
   "publishConfig": {
     "access": "public"
@@ -24,12 +24,12 @@
     "@types/bun": "latest",
     "@types/node": "latest",
     "@types/sass": "latest",
-    "@jopi-loader/types": "workspace: *"
+    "@jopi-loader/types": "workspace:*"
   },
   "dependencies": {
     "chokidar": "^4.0.3",
     "esbuild": "^0.25.9",
-    "jopi-node-space": "workspace: *",
+    "jopi-node-space": "workspace:*",
     "postcss": "^8.5.6",
     "postcss-modules": "^6.0.1",
     "sass": "^1.90.0",

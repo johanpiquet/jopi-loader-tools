@@ -21,7 +21,8 @@
     "build": "npx tsgo",
     "tsc": "npx tsc",
 
-    "bun-publish": "npx tsc && bun publish"
+    "bun-publish": "npx tsc && bun publish",
+    "untrack": "git rm -r --cached -- ./dist/**;"
   },
   "publishConfig": {
     "access": "public"

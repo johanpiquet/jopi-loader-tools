@@ -68,6 +68,8 @@ export async function jopiLauncherTool(jsEngine: string) {
         let pckJson = findPackageJson();
 
         if (pckJson) {
+            if (mustLog) console.log("Jopi - package.json file found at", pckJson);
+
             try {
                 let json = JSON.parse(await nFS.readTextFromFile(pckJson));
                 let watchDirEntry: any = json.watchDirs;
@@ -95,8 +97,15 @@ export async function jopiLauncherTool(jsEngine: string) {
             let srcDir = path.join(path.dirname(pckJson), "src");
 
             if (await nFS.isDirectory(srcDir)) {
-                res.dirToWatch.push(srcDir);
+                if (mustLog) console.log("Jopi - source dir found at", srcDir);
+            } else {
+                srcDir = path.dirname(pckJson);
+                if (mustLog) console.log("Jopi - use this dir for sources", srcDir);
             }
+
+            res.dirToWatch.push(srcDir);
+        } else if (isDevMode) {
+            console.warn("Jopi - package.json not found, can't enable file watching");
         }
 
         let watch = process.env.WATCH;
@@ -159,7 +168,7 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     const cwd = process.cwd();
 
-    if (mustLog) console.log("Use current working dir:", cwd);
+    if (mustLog) console.log("Jopi - Use current working dir:", cwd);
     if (mustLog) console.log("Jopi - Executing:", cmd, ...args);
 
     let env: Record<string, string> = {...process.env} as Record<string, string>;
@@ -177,6 +186,9 @@ export async function jopiLauncherTool(jsEngine: string) {
         }
     }
 
+    if (mustLog) {
+        console.log("Jopi - Will watch directories:", watchInfos.dirToWatch);
+    }
     const watcher = new SourceChangesWatcher({
         cmd, env, args, isDev: isDevMode,
         watchDirs: watchInfos.dirToWatch,

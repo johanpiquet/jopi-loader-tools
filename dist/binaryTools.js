@@ -110,16 +110,18 @@ export async function jopiLauncherTool(jsEngine) {
     let preloadArgs = [];
     // We need the absolute path.
     toPreload.forEach(pkg => {
-        const pkgPath = findModuleDir(pkg);
-        if (!pkgPath)
-            return;
+        /*const pkgPath = findModuleDir(pkg);
+        if (!pkgPath) return;
+
         let foundPath = getRelativePath(findModuleEntryPoint(pkgPath));
-        if (isWin32)
-            foundPath = convertWin32ToLinuxPath(foundPath);
+        if (isWin32) foundPath = convertWin32ToLinuxPath(foundPath);
+
         if (foundPath) {
             preloadArgs.push(importFlag);
             preloadArgs.push(foundPath);
-        }
+        }*/
+        preloadArgs.push(importFlag);
+        preloadArgs.push(pkg);
     });
     let cmd = findExecutable(jsEngine, jsEngine);
     if (mustLog)

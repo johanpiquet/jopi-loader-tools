@@ -138,7 +138,7 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     // We need the absolute path.
     toPreload.forEach(pkg => {
-        const pkgPath = findModuleDir(pkg);
+        /*const pkgPath = findModuleDir(pkg);
         if (!pkgPath) return;
 
         let foundPath = getRelativePath(findModuleEntryPoint(pkgPath));
@@ -147,7 +147,10 @@ export async function jopiLauncherTool(jsEngine: string) {
         if (foundPath) {
             preloadArgs.push(importFlag);
             preloadArgs.push(foundPath);
-        }
+        }*/
+
+        preloadArgs.push(importFlag);
+        preloadArgs.push(pkg);
     });
 
     let cmd = findExecutable(jsEngine, jsEngine)!;
@@ -196,7 +199,6 @@ export async function jopiLauncherTool(jsEngine: string) {
         watcher.spawnChild(true).catch(console.error);
     }
 }
-
 
 function tryOpenWS(port: number): Promise<void> {
     return new Promise((resolve, reject) => {

@@ -13,7 +13,7 @@ import {
 const nFS = NodeSpace.fs;
 
 const FORCE_LOG = false;
-const FORCE_LOG_BUN = true;
+const FORCE_LOG_BUN = false;
 
 enum WATCH_MODE { NONE, SOURCES }
 

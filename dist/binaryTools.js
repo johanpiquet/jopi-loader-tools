@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { convertWin32ToLinuxPath, findExecutable, findModuleDir, findModuleEntryPoint, findPackageJson, getRelativePath } from "./tools.js";
 const nFS = NodeSpace.fs;
 const FORCE_LOG = false;
-const FORCE_LOG_BUN = true;
+const FORCE_LOG_BUN = false;
 var WATCH_MODE;
 (function (WATCH_MODE) {
     WATCH_MODE[WATCH_MODE["NONE"] = 0] = "NONE";

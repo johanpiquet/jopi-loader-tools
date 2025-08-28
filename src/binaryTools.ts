@@ -2,17 +2,11 @@ import path from "node:path";
 import fs from "node:fs";
 import {SourceChangesWatcher} from "./sourceChangesWatcher.ts";
 import { WebSocketServer, WebSocket } from 'ws';
-import {
-    convertWin32ToLinuxPath,
-    findExecutable,
-    findModuleDir,
-    findModuleEntryPoint, findPackageJson,
-    getRelativePath
-} from "./tools.js";
+import {findExecutable, findPackageJson,} from "./tools.js";
 
 const nFS = NodeSpace.fs;
 
-const FORCE_LOG = false;
+const FORCE_LOG = true;
 const FORCE_LOG_BUN = false;
 
 enum WATCH_MODE { NONE, SOURCES }
@@ -130,7 +124,6 @@ export async function jopiLauncherTool(jsEngine: string) {
     const VERSION = "v1.1.1"
     const mustLog = process.env.JOPI_LOG || FORCE_LOG || (FORCE_LOG_BUN && (jsEngine==="bun"));
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
-    const isWin32 = path.sep === '\\';
     let isDevMode = process.env.NODE_ENV !== 'production';
 
     if (mustLog) console.log("Jopi version:", VERSION);
@@ -172,8 +165,19 @@ export async function jopiLauncherTool(jsEngine: string) {
     if (mustLog) console.log("Jopi - Executing:", cmd, ...args);
 
     let env: Record<string, string> = {...process.env} as Record<string, string>;
+
     let watchInfos = await getWatchInfos();
     let mustWatch = watchInfos.mode !== WATCH_MODE.NONE;
+
+    if (mustWatch && jsEngine==="bun") {
+        if (process.argv.includes("--hot")) {
+            mustWatch = false;
+            if (mustLog) console.log("Jopi - Hot reload option is set for bun.js (--hot). Will not watch sources");
+        } else  if (process.argv.includes("--watch")) {
+            mustWatch = false;
+            if (mustLog) console.log("Jopi - Watch option is set for bun.js (--watch). Will not watch sources");
+        }
+    }
 
     if (mustWatch) {
         env["JOPIN_SOURCE_WATCHING_ENABLED"] = "1";
@@ -186,9 +190,6 @@ export async function jopiLauncherTool(jsEngine: string) {
         }
     }
 
-    if (mustLog) {
-        console.log("Jopi - Will watch directories:", watchInfos.dirToWatch);
-    }
     const watcher = new SourceChangesWatcher({
         cmd, env, args, isDev: isDevMode,
         watchDirs: watchInfos.dirToWatch,
@@ -205,6 +206,10 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     if (mustWatch) {
+        if (mustLog) {
+            console.log("Jopi - Will watch directories:", watchInfos.dirToWatch);
+        }
+
         NodeSpace.term.logBgBlue("Source watching enabled");
         watcher.start().catch(console.error);
     } else {

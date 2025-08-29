@@ -6,6 +6,9 @@
     "outDir": "./dist",
     "rootDir": "./src",
 
+    "incremental": true,
+    "composite": true,
+
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
 
     "jsx": "react-jsx",

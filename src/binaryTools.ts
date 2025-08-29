@@ -6,7 +6,7 @@ import {findExecutable, findPackageJson,} from "./tools.js";
 
 const nFS = NodeSpace.fs;
 
-const FORCE_LOG = true;
+const FORCE_LOG = false;
 const FORCE_LOG_BUN = false;
 
 enum WATCH_MODE { NONE, SOURCES }

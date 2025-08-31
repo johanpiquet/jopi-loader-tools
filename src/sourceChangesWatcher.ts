@@ -19,6 +19,7 @@ export interface SourceChangesWatcherParams {
  */
 export class SourceChangesWatcher {
     private readonly _fileWatchingDelay: number = 500;
+    private _areSignalCatch = false;
 
     private restarting = false;
     private _isStarted = false;
@@ -153,10 +154,14 @@ export class SourceChangesWatcher {
 
         let useShell = this._cmd.endsWith('.cmd') || this._cmd.endsWith('.bat') || this._cmd.endsWith('.sh');
 
-        process.on('SIGTERM', ()=>this.killAll());
-        process.on('SIGINT', ()=>this.killAll());
-        process.on('SIGHUP', ()=>this.killAll());
-        process.on('exit', ()=>this.killAll());
+        if (!this._areSignalCatch) {
+            this._areSignalCatch = true;
+
+            process.on('SIGTERM', () => this.killAll());
+            process.on('SIGINT', () => this.killAll());
+            process.on('SIGHUP', () => this.killAll());
+            process.on('exit', () => this.killAll());
+        }
 
         const child = spawn(this._cmd, this._args, {
             stdio: "inherit", shell: useShell,

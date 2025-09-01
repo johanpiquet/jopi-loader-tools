@@ -1,22 +1,31 @@
-import path from "node:path";
 import fs from "node:fs";
-import {SourceChangesWatcher} from "./sourceChangesWatcher.ts";
 import { WebSocketServer, WebSocket } from 'ws';
-import {findExecutable, findPackageJson,} from "./tools.js";
+import { findExecutable, findPackageJson } from "./tools.js";
+import {type ChildProcess, spawn} from "node:child_process";
 
 const nFS = NodeSpace.fs;
 
 const FORCE_LOG = false;
 const FORCE_LOG_BUN = false;
 
-enum WATCH_MODE { NONE, SOURCES }
+let mustLog = false;
 
 interface WatchInfos {
-    mode: WATCH_MODE;
-    dirToWatch: string[];
+    needWatch: boolean;
+    needHot?: boolean;
 }
 
 export async function jopiLauncherTool(jsEngine: string) {
+    function onSpawned() {
+        // If gMustWaitServerReady is set, this means the server
+        // will send us a signal once ready. Without that we refresh
+        // once the server is created.
+
+        if (!gMustWaitServerReady) {
+            setTimeout(wsAskRefreshBrowser, 100);
+        }
+    }
+
     function addKnownPackages(toPreload: string[], toSearch: string[]) {
         if (!toSearch) return;
 
@@ -58,7 +67,8 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     async function getWatchInfos(): Promise<WatchInfos> {
-        let res: WatchInfos = {mode: isDevMode ? WATCH_MODE.SOURCES : WATCH_MODE.NONE, dirToWatch: []};
+        let res: WatchInfos = {needWatch: isDevMode, needHot: isDevMode && (jsEngine==="bun")};
+
         let pckJson = findPackageJson();
 
         if (pckJson) {
@@ -66,38 +76,24 @@ export async function jopiLauncherTool(jsEngine: string) {
 
             try {
                 let json = JSON.parse(await nFS.readTextFromFile(pckJson));
-                let watchDirEntry: any = json.watchDirs;
-                if (!watchDirEntry) watchDirEntry = json["watch-dirs"];
-                if (!watchDirEntry) watchDirEntry = json["watch"];
+                let jopi: any = json["jopi"];
 
-                if (watchDirEntry) {
-                    if (watchDirEntry===true) {
-                        res.mode = WATCH_MODE.SOURCES;
-                    } else if (watchDirEntry===false) {
-                        res.mode = WATCH_MODE.NONE;
-                    } else if (watchDirEntry instanceof Array) {
-                        for (let value of watchDirEntry) {
-                            if (typeof(value) === "string") {
-                                res.dirToWatch.push(path.resolve(value));
-                            }
-                        }
+                if (jopi) {
+                    if (jopi.watch===true) {
+                        // Force true, even for prod.
+                        res.needWatch = true;
+                    } else if (jopi.watch===false) {
+                        res.needWatch = false;
+                    }
+
+                    if (jopi.hot===true) {
+                        res.needHot = true;
                     }
                 }
             }
             catch (e) {
                 console.error(e);
             }
-
-            let srcDir = path.join(path.dirname(pckJson), "src");
-
-            if (await nFS.isDirectory(srcDir)) {
-                if (mustLog) console.log("Jopi - source dir found at", srcDir);
-            } else {
-                srcDir = path.dirname(pckJson);
-                if (mustLog) console.log("Jopi - use this dir for sources", srcDir);
-            }
-
-            res.dirToWatch.push(srcDir);
         } else if (isDevMode) {
             console.warn("Jopi - package.json not found, can't enable file watching");
         }
@@ -113,7 +109,11 @@ export async function jopiLauncherTool(jsEngine: string) {
                 case "1":
                 case "true":
                 case "yes":
-                    res.mode = WATCH_MODE.SOURCES;
+                    res.needWatch = true;
+                    break;
+                case "hot":
+                    res.needWatch = true;
+                    res.needHot = true;
                     break;
             }
         }
@@ -122,10 +122,10 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     const VERSION = "v1.1.1"
-    const mustLog = process.env.JOPI_LOG || FORCE_LOG || (FORCE_LOG_BUN && (jsEngine==="bun"));
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
     let isDevMode = process.env.NODE_ENV !== 'production';
 
+    mustLog = process.env.JOPI_LOG==="1" || FORCE_LOG || (FORCE_LOG_BUN && (jsEngine==="bun"));
     if (mustLog) console.log("Jopi version:", VERSION);
 
     const knowPackagesToPreload = ["jopi-rewrite"];
@@ -159,25 +159,28 @@ export async function jopiLauncherTool(jsEngine: string) {
     if (mustLog) console.log("Jopi - Using " + jsEngine + " from:", cmd);
     let args = [...preloadArgs, ...argv];
 
-    const cwd = process.cwd();
-
-    if (mustLog) console.log("Jopi - Use current working dir:", cwd);
-    if (mustLog) console.log("Jopi - Executing:", cmd, ...args);
-
-    let env: Record<string, string> = {...process.env} as Record<string, string>;
-
     let watchInfos = await getWatchInfos();
-    let mustWatch = watchInfos.mode !== WATCH_MODE.NONE;
 
-    if (mustWatch && jsEngine==="bun") {
-        if (process.argv.includes("--hot")) {
-            mustWatch = false;
-            if (mustLog) console.log("Jopi - Hot reload option is set for bun.js (--hot). Will not watch sources");
-        } else  if (process.argv.includes("--watch")) {
-            mustWatch = false;
-            if (mustLog) console.log("Jopi - Watch option is set for bun.js (--watch). Will not watch sources");
+    args = args.filter(arg => {
+        if (arg === "--hot") {
+            watchInfos.needHot = true;
+            watchInfos.needWatch = true;
+            return false;
         }
-    }
+
+        if (arg === "--watch") {
+            watchInfos.needHot = false;
+            watchInfos.needWatch = true;
+            return false;
+        }
+
+        return arg !== "--watch-path";
+    });
+
+    let mustWatch = watchInfos.needWatch;
+
+    const cwd = process.cwd();
+    let env: Record<string, string> = {...process.env} as Record<string, string>;
 
     if (mustWatch) {
         env["JOPIN_SOURCE_WATCHING_ENABLED"] = "1";
@@ -188,32 +191,81 @@ export async function jopiLauncherTool(jsEngine: string) {
             env["JOPIN_BROWSER_REFRESH_ENABLED"] = "1";
             env["JOPIN_WEBSOCKET_URL"] = wsUrl;
         }
+
+        let toPrepend: string[] = [];
+
+        if (watchInfos.needHot) toPrepend.push("--hot");
+        else toPrepend.push("--watch");
+
+        args = [...toPrepend, ...args];
+        NodeSpace.term.logBgBlue("Source watching enabled");
     }
 
-    const watcher = new SourceChangesWatcher({
+    if (mustLog) console.log("Jopi - Use current working dir:", cwd);
+    if (mustLog) console.log("Jopi - Executing:", cmd, ...args);
+
+    spawnChild({
         cmd, env, args, isDev: isDevMode,
-        watchDirs: watchInfos.dirToWatch,
+        onSpawned
+    });
+}
+
+export interface SpawnParams {
+    env?: Record<string, string>;
+    cmd: string;
+    args: string[];
+    isDev: boolean;
+    onSpawned?: (child: ChildProcess) => void;
+}
+
+function spawnChild(params: SpawnParams): void {
+    function killAll(signalName: NodeJS.Signals) {
+        if (child.killed) return;
+
+        if (params.isDev) {
+            // > Do a fast hard kill.
+            child.kill('SIGKILL');
+            process.exit(0);
+        } else {
+            child.kill(signalName);
+
+            setTimeout(() => {
+                if (!child.killed) {
+                    child.kill('SIGKILL');
+                }
+            }, 1000);
+        }
+    }
+
+    let useShell = params.cmd.endsWith('.cmd') || params.cmd.endsWith('.bat') || params.cmd.endsWith('.sh');
+
+    process.on('SIGTERM', () => killAll("SIGTERM"));
+    process.on('SIGINT', () => killAll("SIGINT"));
+    process.on('SIGHUP', () => killAll("SIGHUP"));
+    process.on('exit', () => killAll("exit" as NodeJS.Signals));
+
+    const child = spawn(params.cmd, params.args, {
+        stdio: "inherit", shell: useShell,
+        cwd: process.cwd(),
+        env: params.env
     });
 
-    watcher.onSpawned = () => {
-        // If gMustWaitServerReady is set, this means the server
-        // will send us a signal once ready. Without that we refresh
-        // once the server is created.
+    child.on('exit', (code, signal) => {
+        // The current instance has stopped?
+        if (signal) process.kill(process.pid, signal);
+        else process.exit(code ?? 0);
+    });
 
-        if (!gMustWaitServerReady) {
-            setTimeout(wsAskRefreshBrowser, 100);
-        }
-    }
+    child.on('error', (err) => {
+        // The current instance is in error?
+        console.error(err.message || String(err));
+        process.exit(1);
+    });
 
-    if (mustWatch) {
-        if (mustLog) {
-            console.log("Jopi - Will watch directories:", watchInfos.dirToWatch);
-        }
-
-        NodeSpace.term.logBgBlue("Source watching enabled");
-        watcher.start().catch(console.error);
-    } else {
-        watcher.spawnChild(true).catch(console.error);
+    if (params.onSpawned) {
+        child.on('spawn', () => {
+            params.onSpawned!(child);
+        })
     }
 }
 
@@ -251,17 +303,20 @@ async function startWebSocket(): Promise<string|undefined> {
 }
 
 function onWebSocketConnection(ws: WebSocket) {
-    //console.log("Client connected to web-socket");
+    if (mustLog) NodeSpace.term.logBgGreen("Client connected to web-socket")
     gWebSockets.push(ws);
 
     ws.onclose = (e) => {
         let idx = gWebSockets.indexOf(e.target);
         gWebSockets.splice(idx, 1);
+
+        if (mustLog) NodeSpace.term.logBgRed("Child process is restarting");
+        startWebSocket().catch();
     }
 
     ws.onmessage = (e) => {
         const msg = e.data;
-        //console.log("jopin message received: ", msg);
+        if (mustLog) NodeSpace.term.logBlue("jopin websocket message received: ", msg);
 
         switch (msg) {
             case "mustWaitServerReady":

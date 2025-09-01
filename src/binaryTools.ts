@@ -3,11 +3,11 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { findExecutable, findPackageJson } from "./tools.js";
 import {type ChildProcess, spawn} from "node:child_process";
 
+// *************************
+const FORCE_LOG = true;
+// *************************
+
 const nFS = NodeSpace.fs;
-
-const FORCE_LOG = false;
-const FORCE_LOG_BUN = false;
-
 let mustLog = false;
 
 interface WatchInfos {
@@ -125,7 +125,7 @@ export async function jopiLauncherTool(jsEngine: string) {
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
     let isDevMode = process.env.NODE_ENV !== 'production';
 
-    mustLog = process.env.JOPI_LOG==="1" || FORCE_LOG || (FORCE_LOG_BUN && (jsEngine==="bun"));
+    mustLog = process.env.JOPI_LOG==="1" || FORCE_LOG;
     if (mustLog) console.log("Jopi version:", VERSION);
 
     const knowPackagesToPreload = ["jopi-rewrite"];
@@ -294,8 +294,8 @@ async function startWebSocket(): Promise<string|undefined> {
             //console.log("Port accepted: " + port);
             return "ws://127.0.0.1:" + port
         }
-        catch(_e) {
-            console.log("Port", port, "is ko");
+        catch {
+            //console.log("Port", port, "is ko");
         }
     }
 

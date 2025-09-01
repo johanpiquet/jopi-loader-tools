@@ -4,7 +4,7 @@ import { findExecutable, findPackageJson } from "./tools.js";
 import {type ChildProcess, spawn} from "node:child_process";
 
 // *************************
-const FORCE_LOG = true;
+const FORCE_LOG = false;
 // *************************
 
 const nFS = NodeSpace.fs;

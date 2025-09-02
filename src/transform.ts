@@ -4,6 +4,8 @@ import path from "node:path";
 import fs from "node:fs/promises";
 
 import "jopi-node-space";
+import {findPackageJson} from "./tools.js";
+import {getAssetsHash} from "@jopi-loader/client";
 
 const nFS = NodeSpace.fs;
 
@@ -42,6 +44,14 @@ export default __PATH__;`
 }
 
 async function transform_filePath(filePath: string) {
+    const config = await getTransformConfig();
+
+    if (config) {
+        let fileExtension = path.extname(filePath);
+        let fileNameWithoutExt = path.basename(filePath).slice(0, -fileExtension.length);
+        filePath = config.webSiteUrl + config.webResourcesRoot + fileNameWithoutExt + '-' + getAssetsHash() + fileExtension;
+    }
+
     return `const __PATH__ = ${JSON.stringify(filePath)}; export default __PATH__;`;
 }
 
@@ -86,5 +96,42 @@ async function transform_inline(filePath: string) {
         resText = `data:${mimeType};base64,${resText}`;
     }
 
-    return `export default  ${JSON.stringify(resText)};`
+    return `export default ${JSON.stringify(resText)};`
+}
+
+interface TransformConfig {
+    webSiteUrl: string;
+    webResourcesRoot: string;
+}
+
+let gTransformConfig: undefined|null|TransformConfig;
+
+async function getTransformConfig(): Promise<TransformConfig|undefined|null> {
+    if (gTransformConfig!==undefined) return gTransformConfig;
+    let pkgJson = findPackageJson();
+
+    if (pkgJson) {
+        try {
+            let json = JSON.parse(await NodeSpace.fs.readTextFromFile(pkgJson));
+            let jopi = json.jopi;
+
+            if (jopi && jopi.webSiteUrl) {
+                let url = jopi.webSiteUrl;
+                if (!url.endsWith("/")) url += '/';
+
+                let root = jopi.webResourcesRoot || "_bundle";
+                if (root[0]==='/') root = root.substring(1);
+                if (!root.endsWith("/")) root += "/";
+
+                return gTransformConfig = {
+                    webSiteUrl: url,
+                    webResourcesRoot: root
+                };
+            }
+        } catch {
+
+        }
+    }
+
+    return gTransformConfig = null;
 }

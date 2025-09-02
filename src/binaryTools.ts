@@ -198,7 +198,8 @@ export async function jopiLauncherTool(jsEngine: string) {
         else toPrepend.push("--watch");
 
         args = [...toPrepend, ...args];
-        NodeSpace.term.logBgBlue("Source watching enabled");
+        NodeSpace.term.logBgBlue("Source watching enabled. Set 'NODE_ENV' env variable to 'production' to disable it.");
+        console.log("(set 'NODE_ENV' environment variable to 'product' to disable it)");
     }
 
     if (mustLog) console.log("Jopi - Use current working dir:", cwd);

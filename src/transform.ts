@@ -86,6 +86,15 @@ async function transform_inline(filePath: string) {
     if ((type==="text")||(type==="css")) {
         resText = await nFS.readTextFromFile(filePath);
     } else {
+        const config = await getTransformConfig();
+        let maxSize = config ? config.inlineMaxSize_ko : INLINE_MAX_SIZE_KO;
+
+        let fileSize = Math.trunc(await nFS.getFileSize(filePath) / 1024);
+
+        if (fileSize > maxSize) {
+            return transform_filePath(filePath);
+        }
+
         const buffer: Buffer = await fs.readFile(filePath);
         const mimeType = nFS.getMimeTypeFromName(filePath);
 
@@ -99,14 +108,38 @@ async function transform_inline(filePath: string) {
     return `export default ${JSON.stringify(resText)};`
 }
 
-interface TransformConfig {
+/**
+ * The value of the "jopi" entry in package.json
+ */
+interface PackageJson_jopi {
+    /**
+     * When importing a file, if this option is set, then
+     * we will not return a file path on the filesystem
+     * but an url pointing to this resource.
+     */
     webSiteUrl: string;
+
+    /**
+     * Is used with `webSiteUrl` in order to known where
+     * whe cas found the resource. Will allow installing
+     * a file server.
+     */
     webResourcesRoot: string;
+
+    /**
+     * File which size is over this limite
+     * will not be inlined when option ?inline
+     * is set in the 'import', but resolved as
+     * a file path (or ulr).
+     */
+    inlineMaxSize_ko: number;
 }
 
-let gTransformConfig: undefined|null|TransformConfig;
+const INLINE_MAX_SIZE_KO = 10;
 
-async function getTransformConfig(): Promise<TransformConfig|undefined|null> {
+let gTransformConfig: undefined|null|PackageJson_jopi;
+
+async function getTransformConfig(): Promise<PackageJson_jopi|undefined|null> {
     if (gTransformConfig!==undefined) return gTransformConfig;
     let pkgJson = findPackageJson();
 
@@ -123,9 +156,16 @@ async function getTransformConfig(): Promise<TransformConfig|undefined|null> {
                 if (root[0]==='/') root = root.substring(1);
                 if (!root.endsWith("/")) root += "/";
 
+                let inlineMaxSize_ko = INLINE_MAX_SIZE_KO;
+
+                if (typeof(jopi.inlineMaxSize_ko)=="number") {
+                    inlineMaxSize_ko = jopi.inlineMaxSize_ko;
+                }
+
                 return gTransformConfig = {
                     webSiteUrl: url,
-                    webResourcesRoot: root
+                    webResourcesRoot: root,
+                    inlineMaxSize_ko
                 };
             }
         } catch {

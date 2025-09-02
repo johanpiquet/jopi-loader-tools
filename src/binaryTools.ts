@@ -1,7 +1,8 @@
 import fs from "node:fs";
-import { WebSocketServer, WebSocket } from 'ws';
-import { findExecutable, findPackageJson } from "./tools.js";
+import {WebSocket, WebSocketServer} from 'ws';
+import {findExecutable, findPackageJson} from "./tools.js";
 import {type ChildProcess, spawn} from "node:child_process";
+import path from "node:path";
 
 // *************************
 const FORCE_LOG = false;
@@ -13,6 +14,8 @@ let mustLog = false;
 interface WatchInfos {
     needWatch: boolean;
     needHot?: boolean;
+    hasJopiWatchTask?: boolean;
+    packageJsonFilePath?: string;
 }
 
 export async function jopiLauncherTool(jsEngine: string) {
@@ -68,13 +71,15 @@ export async function jopiLauncherTool(jsEngine: string) {
         }
     }
 
-    async function getWatchInfos(): Promise<WatchInfos> {
-        let res: WatchInfos = {needWatch: isDevMode, needHot: isDevMode && (jsEngine==="bun")};
+    async function getConfiguration(): Promise<WatchInfos> {
+        let res: WatchInfos = {needWatch: process.env.NODE_ENV !== 'production', needHot: process.env.NODE_ENV !== 'production' && (jsEngine==="bun")};
 
         let pckJson = findPackageJson();
 
         if (pckJson) {
             if (mustLog) console.log("Jopi - package.json file found at", pckJson);
+
+            res.packageJsonFilePath = pckJson;
 
             try {
                 let json = JSON.parse(await nFS.readTextFromFile(pckJson));
@@ -92,11 +97,19 @@ export async function jopiLauncherTool(jsEngine: string) {
                         res.needHot = true;
                     }
                 }
+
+                if (json.scripts) {
+                    let scripts = json.scripts;
+
+                    if (scripts.jopiWatch) {
+                        res.hasJopiWatchTask = true;
+                    }
+                }
             }
             catch (e) {
                 console.error(e);
             }
-        } else if (isDevMode) {
+        } else if (process.env.NODE_ENV !== 'production') {
             console.warn("Jopi - package.json not found, can't enable file watching");
         }
 
@@ -125,7 +138,7 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     const VERSION = "v1.1.1"
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
-    let isDevMode = process.env.NODE_ENV !== 'production';
+    gIsDevMode = process.env.NODE_ENV !== 'production';
 
     mustLog = process.env.JOPI_LOG==="1" || FORCE_LOG;
     if (mustLog) console.log("Jopi version:", VERSION);
@@ -161,25 +174,25 @@ export async function jopiLauncherTool(jsEngine: string) {
     if (mustLog) console.log("Jopi - Using " + jsEngine + " from:", cmd);
     let args = [...preloadArgs, ...argv];
 
-    let watchInfos = await getWatchInfos();
+    let config = await getConfiguration();
 
     args = args.filter(arg => {
         if (arg === "--hot") {
-            watchInfos.needHot = true;
-            watchInfos.needWatch = true;
+            config.needHot = true;
+            config.needWatch = true;
             return false;
         }
 
         if (arg === "--watch") {
-            watchInfos.needHot = false;
-            watchInfos.needWatch = true;
+            config.needHot = false;
+            config.needWatch = true;
             return false;
         }
 
         return arg !== "--watch-path";
     });
 
-    let mustWatch = watchInfos.needWatch;
+    let mustWatch = config.needWatch;
 
     const cwd = process.cwd();
     let env: Record<string, string> = {...process.env} as Record<string, string>;
@@ -196,7 +209,7 @@ export async function jopiLauncherTool(jsEngine: string) {
 
         let toPrepend: string[] = [];
 
-        if (watchInfos.needHot) toPrepend.push("--hot");
+        if (config.needHot) toPrepend.push("--hot");
         else toPrepend.push("--watch");
 
         args = [...toPrepend, ...args];
@@ -207,25 +220,36 @@ export async function jopiLauncherTool(jsEngine: string) {
     if (mustLog) console.log("Jopi - Use current working dir:", cwd);
     if (mustLog) console.log("Jopi - Executing:", cmd, ...args);
 
-    spawnChild({
-        cmd, env, args, isDev: isDevMode,
-        onSpawned
-    });
+    let mainSpawnParams: SpawnParams =  {
+        cmd, env, args, onSpawned, cwd: process.cwd(), killOnExit: false
+    };
+
+    spawnChild(mainSpawnParams);
+
+    if (config.hasJopiWatchTask) {
+        let cwd = path.dirname(config.packageJsonFilePath!);
+        cmd = jsEngine=="node" ? "npm": "bun";
+        spawnChild({cmd, env, cwd, args: ["run", "jopiWatch"], killOnExit: false})
+    }
 }
 
 export interface SpawnParams {
     env?: Record<string, string>;
     cmd: string;
     args: string[];
-    isDev: boolean;
+    cwd: string;
+    killOnExit: boolean;
     onSpawned?: (child: ChildProcess) => void;
 }
 
-function spawnChild(params: SpawnParams): void {
-    function killAll(signalName: NodeJS.Signals) {
+const gToKill: ChildProcess[] = [];
+let gIsDevMode = false;
+
+function killAll(signalName: NodeJS.Signals) {
+    gToKill.forEach(child => {
         if (child.killed) return;
 
-        if (params.isDev) {
+        if (gIsDevMode) {
             // > Do a fast hard kill.
             child.kill('SIGKILL');
             process.exit(0);
@@ -238,8 +262,10 @@ function spawnChild(params: SpawnParams): void {
                 }
             }, 1000);
         }
-    }
+    });
+}
 
+function spawnChild(params: SpawnParams): void {
     let useShell = params.cmd.endsWith('.cmd') || params.cmd.endsWith('.bat') || params.cmd.endsWith('.sh');
 
     process.on('SIGTERM', () => killAll("SIGTERM"));
@@ -253,17 +279,21 @@ function spawnChild(params: SpawnParams): void {
         env: params.env
     });
 
-    child.on('exit', (code, signal) => {
-        // The current instance has stopped?
-        if (signal) process.kill(process.pid, signal);
-        else process.exit(code ?? 0);
-    });
+    gToKill.push(child);
 
-    child.on('error', (err) => {
-        // The current instance is in error?
-        console.error(err.message || String(err));
-        process.exit(1);
-    });
+    if (params.killOnExit) {
+        child.on('exit', (code, signal) => {
+            // The current instance has stopped?
+            if (signal) process.kill(process.pid, signal);
+            else process.exit(code ?? 0);
+        });
+
+        child.on('error', (err) => {
+            // The current instance is in error?
+            console.error(err.message || String(err));
+            process.exit(1);
+        });
+    }
 
     if (params.onSpawned) {
         child.on('spawn', () => {

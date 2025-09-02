@@ -49,9 +49,11 @@ export async function jopiLauncherTool(jsEngine: string) {
 
             let toPreload: string[] = [];
 
-            if (packageData.preload) {
-                if (Array.isArray(packageData.preload)) {
-                    toPreload = [...toPreload, ...packageData.preload];
+            let jopi = packageData.jopi;
+
+            if (jopi && jopi.preload) {
+                if (Array.isArray(jopi.preload)) {
+                    toPreload = [...toPreload, ...jopi.preload];
                 }
             }
 

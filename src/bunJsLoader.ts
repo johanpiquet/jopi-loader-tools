@@ -1,5 +1,6 @@
 import {supportedExtensionsRegExp} from "./rules.ts";
 import {transformFile} from "./transform.ts";
+import {installEsBuildPlugins} from "./esBuildPlugin.js";
 
 // https://bun.com/docs/runtime/plugins
 
@@ -7,8 +8,9 @@ export function installBunJsLoader() {
     Bun.plugin({
         name: "jopi-loader",
         setup(build) {
+            installEsBuildPlugins(build, true);
             build.onLoad({filter: supportedExtensionsRegExp}, jopiHandler);
-        },
+        }
     });
 }
 

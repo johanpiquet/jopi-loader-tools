@@ -44,7 +44,7 @@ export default __PATH__;`
 }
 
 async function transform_filePath(sourceFilePath: string) {
-    const config = await getTransformConfig();
+    const config = getTransformConfig();
     let resUrl: string;
 
     if (config && config.webSiteUrl) {
@@ -92,7 +92,7 @@ async function transform_inline(filePath: string) {
     if ((type==="text")||(type==="css")) {
         resText = await nFS.readTextFromFile(filePath);
     } else {
-        const config = await getTransformConfig();
+        const config = getTransformConfig();
         let maxSize = config ? config.inlineMaxSize_ko : INLINE_MAX_SIZE_KO;
 
         let fileSize = Math.trunc(await nFS.getFileSize(filePath) / 1024);
@@ -162,7 +162,7 @@ const INLINE_MAX_SIZE_KO = 10;
 
 let gTransformConfig: undefined|null|PackageJson_jopi;
 
-async function getTransformConfig(): Promise<PackageJson_jopi|undefined|null> {
+export function getTransformConfig(): PackageJson_jopi|undefined|null {
     function urlToPath(url: string) {
         let urlInfos = new URL(url);
         let port = urlInfos.port;
@@ -176,7 +176,7 @@ async function getTransformConfig(): Promise<PackageJson_jopi|undefined|null> {
 
     if (pkgJson) {
         try {
-            let json = JSON.parse(await NodeSpace.fs.readTextFromFile(pkgJson));
+            let json = JSON.parse(NodeSpace.fs.readTextSyncFromFile(pkgJson));
             let jopi = json.jopi;
 
             if (jopi && jopi.webSiteUrl) {

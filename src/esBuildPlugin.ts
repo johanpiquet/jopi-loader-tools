@@ -1,7 +1,6 @@
 import cssModuleCompiler from "./cssModuleCompiler.ts";
 import {isFile, searchSourceOf} from "./tools.js";
 import {transformFile} from "./transform.js";
-import nodePath from "node:path";
 
 // Note: Bun.js plugins are partially compatible with EsBuild modules.
 

@@ -135,7 +135,7 @@ interface PackageJson_jopi {
     inlineMaxSize_ko: number;
 }
 
-const INLINE_MAX_SIZE_KO = 10;
+const INLINE_MAX_SIZE_KO = 100;
 
 let gTransformConfig: undefined|null|PackageJson_jopi;
 

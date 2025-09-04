@@ -6,14 +6,19 @@ import fs from "node:fs";
 
 // Note: Bun.js plugins are partially compatible with EsBuild modules.
 
-const cssModuleHandler: Bun.OnLoadCallback = async ({path}) => {
+interface JopiRawContent {
+    file: string;
+    type: string
+}
+
+async function processCss(path: string) {
     let jsSource = await cssModuleCompiler(path);
 
     return {
         contents: jsSource,
         loader: "js",
     };
-};
+}
 
 async function inlineAndRawModuleHandler(options: string, resPath: string) {
     // Occurs when it's compiled with TypeScript.
@@ -46,27 +51,40 @@ export function resolveAndCheckPath(filePath: string, resolveDir: string): {path
     }
 }
 
-function getTempFileName() {
-    return "mytempfilename.jopiraw"
+function createJopiRawFile(targetFilePath: string, processType: string): any {
+    // Bun.js load doesn't support having an '?' in the path.
+    // It's why we do strange things here to process this case.
+    //
+    // Also, there are strange behaviors that we avoid when using this strategy.
+
+    let options = getTransformConfig();
+    let tempDir = options?.bundlerOutputDir || path.join("temp", "bunjs");
+    fs.mkdirSync(tempDir, {recursive: true});
+
+    let fileName = path.resolve(tempDir, (gNextTemFileName++) + ".jopiraw");
+    fs.writeFileSync(fileName, JSON.stringify({file: targetFilePath, type: processType}));
+
+    return {
+        // The file must exist otherwise
+        // an exception is triggered :-(
+        path: fileName
+    };
 }
 
-export function installEsBuildPlugins(build: Bun.PluginBuilder, isBunJsLoader = false) {
-    // @ts-ignore
-    build.onResolve({filter: /\.(css|scss)$/}, async (args) => {
+export function installEsBuildPlugins(build: Bun.PluginBuilder) {
+    build.onResolve({filter: /\.(css|scss)$/}, (args) => {
         const result = resolveAndCheckPath(args.path, path.dirname(args.importer));
 
         if (result.error) {
             return {
                 errors: [{
-                    text: result.error,
-                    location: null,
+                    text: result.error
                 }]
             };
         }
 
-        return {
-            path: result.path
-        };
+        //@ts-ignore
+        return createJopiRawFile(result.path!, "css");
     });
 
     // @ts-ignore
@@ -83,41 +101,26 @@ export function installEsBuildPlugins(build: Bun.PluginBuilder, isBunJsLoader = 
             };
         }
 
-        filePath = result.path!;
-
-        let options = getTransformConfig();
-        let tempDir = options?.bundlerOutputDir || path.join("temp", "bunjs");
-        fs.mkdirSync(tempDir, {recursive: true});
-
-        let fileName = path.resolve(tempDir, getTempFileName());
-        fs.writeFileSync(fileName, JSON.stringify({file: filePath, option: option}));
-
-        // Bun.js load doesn't support having an '?' in the path.
-        // It's why we do strange things here to process this case.
-        //
-        return {
-            path: fileName
-        };
+        //@ts-ignore
+        return createJopiRawFile(result.path!, "option-" + option);
     });
 
     // @ts-ignore
     build.onLoad({filter: /\.jopiraw$/},  async (args) => {
-        let filePath = args.path;
+        let json = JSON.parse(await NodeSpace.fs.readTextFromFile(args.path)) as JopiRawContent;
+        await NodeSpace.fs.unlink(args.path);
 
-        let json = JSON.parse(await NodeSpace.fs.readTextFromFile(filePath));
-        await NodeSpace.fs.unlink(filePath);
+        let filePath = json.file;
 
-        filePath = json.file;
-        let option = json.option;
-
-        try {
-            return await inlineAndRawModuleHandler(option, filePath);
-        }
-        catch (e) {
-            console.log("Error when bundling (option " + option + ")", e);
+        switch (json.type) {
+            case "option-inline":
+                return inlineAndRawModuleHandler("inline", filePath);
+            case "option-raw":
+                return inlineAndRawModuleHandler("raw", filePath);
+            case "css":
+                return processCss(filePath);
         }
     });
-
-    // @ts-ignore
-    build.onLoad({ filter: /\.(css|scss)$/ }, cssModuleHandler);
 }
+
+let gNextTemFileName = 1;

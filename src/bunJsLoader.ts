@@ -8,7 +8,7 @@ export function installBunJsLoader() {
     Bun.plugin({
         name: "jopi-loader",
         setup(build) {
-            installEsBuildPlugins(build, true);
+            installEsBuildPlugins(build);
             build.onLoad({filter: supportedExtensionsRegExp}, jopiHandler);
         }
     });

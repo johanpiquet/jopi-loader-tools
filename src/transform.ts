@@ -43,16 +43,22 @@ if (global.jopiOnCssImported) global.jopiOnCssImported(__PATH__);
 export default __PATH__;`
 }
 
-async function transform_filePath(filePath: string) {
+async function transform_filePath(sourceFilePath: string) {
     const config = await getTransformConfig();
+    let resUrl: string;
 
-    if (config) {
-        let fileExtension = path.extname(filePath);
-        let fileNameWithoutExt = path.basename(filePath).slice(0, -fileExtension.length);
-        filePath = config.webSiteUrl + config.webResourcesRoot + fileNameWithoutExt + '-' + getAssetsHash() + fileExtension;
+    if (config && config.webSiteUrl) {
+        let fileExtension = path.extname(sourceFilePath);
+        let fileNameWithoutExt = path.basename(sourceFilePath).slice(0, -fileExtension.length);
+        let targetFileName = fileNameWithoutExt + '-' + getAssetsHash() + fileExtension;
+
+        resUrl = config.webSiteUrl + config.webResourcesRoot + targetFileName;
+        await installResourceToBundlerDir(sourceFilePath, targetFileName);
+    } else {
+        resUrl = sourceFilePath;
     }
 
-    return `const __PATH__ = ${JSON.stringify(filePath)}; export default __PATH__;`;
+    return `const __PATH__ = ${JSON.stringify(resUrl)}; export default __PATH__;`;
 }
 
 async function transform_raw(filePath: string) {
@@ -108,6 +114,16 @@ async function transform_inline(filePath: string) {
     return `export default ${JSON.stringify(resText)};`
 }
 
+async function installResourceToBundlerDir(resFilePath: string, destFileName: string) {
+    if (!gTransformConfig || !gTransformConfig.bundlerOutputDir) return;
+    let outputDir = gTransformConfig.bundlerOutputDir;
+
+    await fs.mkdir(outputDir, { recursive: true });
+    let destFilePath = path.join(outputDir, destFileName);
+
+    await fs.copyFile(resFilePath, destFilePath);
+}
+
 /**
  * The value of the "jopi" entry in package.json
  */
@@ -120,7 +136,7 @@ interface PackageJson_jopi {
     webSiteUrl: string;
 
     /**
-     * Is used with `webSiteUrl` in order to known where
+     * Is used with `webSiteUrl` to known where
      * whe cas found the resource. Will allow installing
      * a file server.
      */
@@ -133,13 +149,28 @@ interface PackageJson_jopi {
      * a file path (or ulr).
      */
     inlineMaxSize_ko: number;
+
+    /**
+     * Indicate the directory where the bundler
+     * stores the images and resources.
+     * (use linux path format)
+     */
+    bundlerOutputDir: string;
 }
 
-const INLINE_MAX_SIZE_KO = 100;
+const INLINE_MAX_SIZE_KO = 10;
 
 let gTransformConfig: undefined|null|PackageJson_jopi;
 
 async function getTransformConfig(): Promise<PackageJson_jopi|undefined|null> {
+    function urlToPath(url: string) {
+        let urlInfos = new URL(url);
+        let port = urlInfos.port;
+
+        if (port.length && port[0]!==':') port = ':' + port;
+        return (urlInfos.hostname + port).replaceAll(".", "_").replaceAll(":", "_");
+    }
+
     if (gTransformConfig!==undefined) return gTransformConfig;
     let pkgJson = findPackageJson();
 
@@ -162,14 +193,30 @@ async function getTransformConfig(): Promise<PackageJson_jopi|undefined|null> {
                     inlineMaxSize_ko = jopi.inlineMaxSize_ko;
                 }
 
+                let bundlerOutputDir = root.bundlerOutputDir;
+                //
+                if (!bundlerOutputDir) {
+                    bundlerOutputDir = "./temp/.reactHydrateCache";
+                }
+
+                if (path.sep!=="/") {
+                    bundlerOutputDir = bundlerOutputDir.replaceAll("/", path.sep);
+                }
+
+                if (url) {
+                    bundlerOutputDir = path.join(bundlerOutputDir, urlToPath(url));
+                }
+
+                bundlerOutputDir = path.resolve(bundlerOutputDir);
+
                 return gTransformConfig = {
                     webSiteUrl: url,
                     webResourcesRoot: root,
-                    inlineMaxSize_ko
+                    inlineMaxSize_ko,
+                    bundlerOutputDir
                 };
             }
         } catch {
-
         }
     }
 

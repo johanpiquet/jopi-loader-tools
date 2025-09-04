@@ -8,25 +8,27 @@ export function installBunJsLoader() {
     Bun.plugin({
         name: "jopi-loader",
         setup(build) {
+
+            // For module.css and imports with ?inline and ?raw
             installEsBuildPlugins(build);
-            build.onLoad({filter: supportedExtensionsRegExp}, jopiHandler);
+
+            // For .css/.scss/.png/.txt/...
+            build.onLoad({filter: supportedExtensionsRegExp}, async ({path}) => {
+                let idx = path.indexOf("?");
+                let options = "";
+
+                if (idx !== -1) {
+                    options = path.substring(idx + 1);
+                    path = path.substring(0, idx);
+                }
+
+                const res = await transformFile(path, options);
+
+                return {
+                    contents: res.text,
+                    loader: "js",
+                };
+            });
         }
     });
-}
-
-const jopiHandler: Bun.OnLoadCallback = async ({path}) => {
-    let idx = path.indexOf("?");
-    let options = "";
-
-    if (idx !== -1) {
-        options = path.substring(idx + 1);
-        path = path.substring(0, idx);
-    }
-
-    const res = await transformFile(path, options);
-
-    return {
-        contents: res.text,
-        loader: "js",
-    };
 }

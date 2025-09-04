@@ -11,7 +11,7 @@ interface JopiRawContent {
     type: string
 }
 
-async function processCss(path: string) {
+async function processCssModule(path: string) {
     let jsSource = await cssModuleCompiler(path);
 
     return {
@@ -72,7 +72,7 @@ function createJopiRawFile(targetFilePath: string, processType: string): any {
 }
 
 export function installEsBuildPlugins(build: Bun.PluginBuilder) {
-    build.onResolve({filter: /\.(css|scss)$/}, (args) => {
+    build.onResolve({filter: /\.module\.(css|scss)$/}, (args) => {
         const result = resolveAndCheckPath(args.path, path.dirname(args.importer));
 
         if (result.error) {
@@ -118,7 +118,7 @@ export function installEsBuildPlugins(build: Bun.PluginBuilder) {
             case "option-raw":
                 return inlineAndRawModuleHandler("raw", filePath);
             case "css":
-                return processCss(filePath);
+                return processCssModule(filePath);
         }
     });
 }

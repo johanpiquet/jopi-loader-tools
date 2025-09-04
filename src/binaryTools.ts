@@ -6,6 +6,7 @@ import path from "node:path";
 
 // *************************
 const FORCE_LOG = false;
+const VERSION = "v2.0";
 // *************************
 
 const nFS = NodeSpace.fs;
@@ -136,7 +137,6 @@ export async function jopiLauncherTool(jsEngine: string) {
         return res;
     }
 
-    const VERSION = "v1.1.1"
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
     gIsDevMode = process.env.NODE_ENV !== 'production';
 
@@ -147,6 +147,11 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     // Here first is node.js, second is jopi. (it's du to shebang usage).
     const argv = process.argv.slice(2);
+
+    if (!argv.length) {
+        console.log("jopi-loader "+ VERSION +" installed at ", import.meta.dirname);
+        return;
+    }
 
     let toPreload = getPreloadModules();
     toPreload = ["jopi-loader", ...toPreload];
@@ -213,7 +218,7 @@ export async function jopiLauncherTool(jsEngine: string) {
         else toPrepend.push("--watch");
 
         args = [...toPrepend, ...args];
-        NodeSpace.term.logBgBlue("Source watching enabled. Set 'NODE_ENV' env variable to 'production' to disable it.");
+        NodeSpace.term.logBlue("Source watching enabled. Set 'NODE_ENV' env variable to 'production' to disable it.");
         console.log("(set 'NODE_ENV' environment variable to 'product' to disable it)");
     }
 
@@ -241,9 +246,6 @@ export interface SpawnParams {
     killOnExit: boolean;
     onSpawned?: (child: ChildProcess) => void;
 }
-
-const gToKill: ChildProcess[] = [];
-let gIsDevMode = false;
 
 function killAll(signalName: NodeJS.Signals) {
     gToKill.forEach(child => {
@@ -371,5 +373,7 @@ function wsAskRefreshBrowser() {
     })
 }
 
+const gToKill: ChildProcess[] = [];
+let gIsDevMode = false;
 const gWebSockets: WebSocket[] = [];
 let gMustWaitServerReady: boolean = false;

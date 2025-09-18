@@ -22,7 +22,8 @@ function invertKeys(rec: Record<string, string[]>): Record<string, string> {
 const supportedExtensionsByGroup = {
     css: [".css", ".scss"],
     binary: [".jpg", ".png", ".jpeg", ".gif", ".webp", ".woff", ".woff2", ".ttf", ".avif", ".ico"],
-    text: [".text",".svg", ".glsl"]
+    text: [".txt", ".svg", ".glsl"],
+    json: [".json"]
 };
 
 export const supportedExtensions = toFlatList(supportedExtensionsByGroup);

@@ -70,6 +70,9 @@ async function transform_raw(filePath: string) {
 
     if ((type==="text")||(type==="css")) {
         resText = await nFS.readTextFromFile(filePath);
+    } else if (type==="json") {
+        resText = await nFS.readTextFromFile(filePath);
+        return `export default ${resText};`
     } else {
         const buffer: Buffer = await fs.readFile(filePath);
 
@@ -91,7 +94,11 @@ async function transform_inline(filePath: string) {
 
     if ((type==="text")||(type==="css")) {
         resText = await nFS.readTextFromFile(filePath);
-    } else {
+    } else if (type==="json") {
+        resText = await nFS.readTextFromFile(filePath);
+        return `export default ${resText};`
+    }
+    else {
         const config = getTransformConfig();
         let maxSize = config ? config.inlineMaxSize_ko : INLINE_MAX_SIZE_KO;
 

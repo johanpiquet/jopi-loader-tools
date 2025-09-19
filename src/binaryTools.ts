@@ -23,7 +23,7 @@ function checkIfDevMode() {
     const idx = process.argv.indexOf("--jopi-dev");
     if (idx===-1) return false;
 
-    process.argv = process.argv.splice(idx, 1);
+    process.argv.splice(idx, 1);
     return true;
 }
 

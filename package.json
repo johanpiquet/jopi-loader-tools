@@ -1,6 +1,6 @@
 {
   "name": "@jopi-loader/tools",
-  "version": "1.0.28",
+  "version": "1.0.30",
   "private": false,
   "license": "MIT",
   "description": "Tools for jopi-loader",

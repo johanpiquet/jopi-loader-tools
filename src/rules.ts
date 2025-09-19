@@ -1,3 +1,5 @@
+import "jopi-node-space";
+
 function toFlatList(rec: Record<string, string[]>): string[] {
     let res: string[] = [];
 
@@ -19,12 +21,22 @@ function invertKeys(rec: Record<string, string[]>): Record<string, string> {
     return res;
 }
 
-const supportedExtensionsByGroup = {
+function patchForJsEngine(value: Record<any, any>) {
+    // Bun.js handle JSON specially, with care for import/require differences.
+    if (!NodeSpace.what.isBunJs) {
+        value.text.push(".json");
+    }
+
+    return value;
+}
+
+const supportedExtensionsByGroup = patchForJsEngine({
     css: [".css", ".scss"],
     binary: [".jpg", ".png", ".jpeg", ".gif", ".webp", ".woff", ".woff2", ".ttf", ".avif", ".ico"],
-    text: [".txt", ".svg", ".glsl"],
-    json: [".json"]
-};
+
+    //.json added here by patchForJsEngine if not bun.js
+    text: [".txt", ".svg", ".glsl"]
+});
 
 export const supportedExtensions = toFlatList(supportedExtensionsByGroup);
 export const supportedExtensionToType = invertKeys(supportedExtensionsByGroup);

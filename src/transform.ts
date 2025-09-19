@@ -17,16 +17,28 @@ export interface TransformResult {
 export async function transformFile(filePath: string, options: string): Promise<TransformResult> {
     let text: string;
 
-    if (options=="raw") {
+    if (filePath.endsWith(".json")) {
+        // .json must be ignored with bun.js since some libraries use require and not import.
+        // The matter is that the generated code can't be compatible with import and require
+        // at the same time.
+        //
+        // Moreover, bun.js natif implementation seems way faster.
+        //
+        text = await transform_json(filePath);
+    }
+    else if (options=="raw") {
         text = await transform_raw(filePath);
-    } else if (options==="inline") {
+    }
+    else if (options==="inline") {
         text = await transform_inline(filePath);
     }
     else if (filePath.endsWith(".module.css") || (filePath.endsWith(".module.scss"))) {
         text = await transform_cssModule(filePath);
-    } else if (filePath.endsWith(".css") || (filePath.endsWith(".scss"))) {
+    }
+    else if (filePath.endsWith(".css") || (filePath.endsWith(".scss"))) {
         text = await transform_css(filePath);
-    } else {
+    }
+    else {
         text = await transform_filePath(filePath);
     }
 
@@ -61,6 +73,16 @@ async function transform_filePath(sourceFilePath: string) {
     return `const __PATH__ = ${JSON.stringify(resUrl)}; export default __PATH__;`;
 }
 
+async function transform_json(filePath: string) {
+    const resText = await nFS.readTextFromFile(filePath);
+
+    return `
+const myObject = ${resText};
+if (typeof(module)!=="undefined") module.exports = myObject;
+export default myObject;
+    `;
+}
+
 async function transform_raw(filePath: string) {
     let ext = path.extname(filePath);
     let type = supportedExtensionToType[ext];
@@ -70,9 +92,6 @@ async function transform_raw(filePath: string) {
 
     if ((type==="text")||(type==="css")) {
         resText = await nFS.readTextFromFile(filePath);
-    } else if (type==="json") {
-        resText = await nFS.readTextFromFile(filePath);
-        return `export default ${resText};`
     } else {
         const buffer: Buffer = await fs.readFile(filePath);
 
@@ -94,11 +113,7 @@ async function transform_inline(filePath: string) {
 
     if ((type==="text")||(type==="css")) {
         resText = await nFS.readTextFromFile(filePath);
-    } else if (type==="json") {
-        resText = await nFS.readTextFromFile(filePath);
-        return `export default ${resText};`
-    }
-    else {
+    } else {
         const config = getTransformConfig();
         let maxSize = config ? config.inlineMaxSize_ko : INLINE_MAX_SIZE_KO;
 

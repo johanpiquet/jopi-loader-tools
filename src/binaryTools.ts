@@ -6,7 +6,7 @@ import path from "node:path";
 
 // *************************
 const FORCE_LOG = false;
-const VERSION = "v2.0";
+const VERSION = "v2.1";
 // *************************
 
 const nFS = NodeSpace.fs;
@@ -17,6 +17,14 @@ interface WatchInfos {
     needHot?: boolean;
     hasJopiWatchTask?: boolean;
     packageJsonFilePath?: string;
+}
+
+function checkIfDevMode() {
+    const idx = process.argv.indexOf("--jopi-dev");
+    if (idx===-1) return false;
+
+    process.argv = process.argv.splice(idx, 1);
+    return true;
 }
 
 export async function jopiLauncherTool(jsEngine: string) {
@@ -73,7 +81,10 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     async function getConfiguration(): Promise<WatchInfos> {
-        let res: WatchInfos = {needWatch: process.env.NODE_ENV !== 'production', needHot: process.env.NODE_ENV !== 'production' && (jsEngine==="bun")};
+        let res: WatchInfos = {
+            needWatch: gIsDevMode,
+            needHot: gIsDevMode && (jsEngine==="bun")
+        };
 
         let pckJson = findPackageJson();
 
@@ -138,10 +149,10 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
-    gIsDevMode = process.env.NODE_ENV !== 'production';
 
     mustLog = process.env.JOPI_LOG==="1" || FORCE_LOG;
     if (mustLog) console.log("Jopi version:", VERSION);
+    if (mustLog) console.log("Library @jopi-loader/tools found at", import.meta.dirname);
 
     const knowPackagesToPreload = ["jopi-rewrite"];
 
@@ -158,23 +169,12 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     let preloadArgs: string[] = [];
 
-    // We need the absolute path.
     toPreload.forEach(pkg => {
-        /*const pkgPath = findModuleDir(pkg);
-        if (!pkgPath) return;
-
-        let foundPath = getRelativePath(findModuleEntryPoint(pkgPath));
-        if (isWin32) foundPath = convertWin32ToLinuxPath(foundPath);
-
-        if (foundPath) {
-            preloadArgs.push(importFlag);
-            preloadArgs.push(foundPath);
-        }*/
-
         preloadArgs.push(importFlag);
         preloadArgs.push(pkg);
     });
 
+    //TODO: fast checking of process.argv[0] to speed it upd.
     let cmd = findExecutable(jsEngine, jsEngine)!;
     if (mustLog) console.log("Jopi - Using " + jsEngine + " from:", cmd);
     let args = [...preloadArgs, ...argv];
@@ -256,7 +256,11 @@ function killAll(signalName: NodeJS.Signals) {
             child.kill('SIGKILL');
             process.exit(0);
         } else {
-            child.kill(signalName);
+            try {
+                child.kill(signalName);
+            }
+            catch {
+            }
 
             setTimeout(() => {
                 if (!child.killed) {
@@ -373,7 +377,7 @@ function wsAskRefreshBrowser() {
     })
 }
 
+const gIsDevMode = checkIfDevMode();
 const gToKill: ChildProcess[] = [];
-let gIsDevMode = false;
 const gWebSockets: WebSocket[] = [];
 let gMustWaitServerReady: boolean = false;

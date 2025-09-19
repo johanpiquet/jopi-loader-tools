@@ -24,7 +24,7 @@ function invertKeys(rec: Record<string, string[]>): Record<string, string> {
 function patchForJsEngine(value: Record<any, any>) {
     // Bun.js handle JSON specially, with care for import/require differences.
     if (!NodeSpace.what.isBunJs) {
-        value.text.push(".json");
+       value.text.push(".json");
     }
 
     return value;
@@ -35,7 +35,7 @@ const supportedExtensionsByGroup = patchForJsEngine({
     binary: [".jpg", ".png", ".jpeg", ".gif", ".webp", ".woff", ".woff2", ".ttf", ".avif", ".ico"],
 
     //.json added here by patchForJsEngine if not bun.js
-    text: [".txt", ".svg", ".glsl"]
+    text: [".txt", ".svg", ".glsl", /*".json" added only for node.js */]
 });
 
 export const supportedExtensions = toFlatList(supportedExtensionsByGroup);

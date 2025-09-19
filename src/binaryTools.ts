@@ -10,7 +10,7 @@ const VERSION = "v2.1";
 // *************************
 
 const nFS = NodeSpace.fs;
-let mustLog = false;
+let mustLog = false; // Set env var JOPI_LOG to 1 in order to enable.
 
 interface WatchInfos {
     needWatch: boolean;
@@ -151,7 +151,7 @@ export async function jopiLauncherTool(jsEngine: string) {
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
 
     mustLog = process.env.JOPI_LOG==="1" || FORCE_LOG;
-    if (mustLog) console.log("Jopi version:", VERSION);
+    if (mustLog) console.log("Jopi version:", VERSION, " - engine:", jsEngine);
     if (mustLog) console.log("Library @jopi-loader/tools found at", import.meta.dirname);
 
     const knowPackagesToPreload = ["jopi-rewrite"];

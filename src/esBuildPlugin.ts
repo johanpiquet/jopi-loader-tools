@@ -61,11 +61,11 @@ function createJopiRawFile(targetFilePath: string, processType: string): any {
     let tempDir = options?.bundlerOutputDir || path.join("temp", "bunjs");
     fs.mkdirSync(tempDir, {recursive: true});
 
-    let fileName = path.resolve(tempDir, (gNextTemFileName++) + ".jopiraw");
+    let fileName = path.resolve(tempDir, (gNextTempFileName++) + ".jopiraw");
     fs.writeFileSync(fileName, JSON.stringify({file: targetFilePath, type: processType}));
 
     return {
-        // The file must exist otherwise
+        // The file must exist, otherwise
         // an exception is triggered :-(
         path: fileName
     };
@@ -123,4 +123,4 @@ export function installEsBuildPlugins(build: Bun.PluginBuilder) {
     });
 }
 
-let gNextTemFileName = 1;
+let gNextTempFileName = 1;

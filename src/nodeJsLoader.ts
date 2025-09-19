@@ -35,6 +35,7 @@ export async function doNodeJsResolve(specifier: string, context: any, nextResol
         const basePath = fileURLToPath(url);
 
         const res = await tryResolveFile(basePath + ".js", specifier + ".js");
+
         if (res) {
             return res;
         }
@@ -73,6 +74,7 @@ export async function doNodeJsResolve(specifier: string, context: any, nextResol
 // noinspection JSUnusedGlobalSymbols
 export async function doNodeJsLoad(url: string, context: any, nextLoad: any) {
     if (context.format==="jopi-loader") {
+        debugger;
         let idx = url.indexOf("?");
         let options = "";
 

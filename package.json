@@ -1,6 +1,6 @@
 {
   "name": "@jopi-loader/tools",
-  "version": "1.0.26",
+  "version": "1.0.28",
   "private": false,
   "license": "MIT",
   "description": "Tools for jopi-loader",
@@ -37,7 +37,7 @@
     "chokidar": "^4.0.3",
     "esbuild": "^0.25.9",
     "jopi-node-space": "workspace:^0.0.20",
-    "@jopi-loader/client": "workspace:^1.1.44",
+    "@jopi-loader/client": "workspace:^1.1.45",
     "postcss": "^8.5.6",
     "postcss-modules": "^6.0.1",
     "sass": "^1.90.0",

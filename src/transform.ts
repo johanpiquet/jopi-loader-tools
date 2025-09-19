@@ -75,12 +75,7 @@ async function transform_filePath(sourceFilePath: string) {
 
 async function transform_json(filePath: string) {
     const resText = await nFS.readTextFromFile(filePath);
-
-    return `
-const myObject = ${resText};
-if (typeof(module)!=="undefined") module.exports = myObject;
-export default myObject;
-    `;
+    return `export default ${resText};`;
 }
 
 async function transform_raw(filePath: string) {

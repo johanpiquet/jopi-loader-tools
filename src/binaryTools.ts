@@ -231,7 +231,7 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     spawnChild(mainSpawnParams);
 
-    if (config.hasJopiWatchTask) {
+    if (gIsDevMode && config.hasJopiWatchTask) {
         let cwd = path.dirname(config.packageJsonFilePath!);
         cmd = jsEngine=="node" ? "npm": "bun";
         spawnChild({cmd, env, cwd, args: ["run", "jopiWatch"], killOnExit: false})

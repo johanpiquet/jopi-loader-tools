@@ -6,11 +6,11 @@ import path from "node:path";
 
 // *************************
 const FORCE_LOG = false;
-const VERSION = "v2.1";
+const VERSION = "v1.1.45";
 // *************************
 
 const nFS = NodeSpace.fs;
-let mustLog = false; // Set env var JOPI_LOG to 1 in order to enable.
+let mustLog = false; // Set env var JOPI_LOG to 1 to enable.
 
 interface WatchInfos {
     needWatch: boolean;
@@ -218,8 +218,7 @@ export async function jopiLauncherTool(jsEngine: string) {
         else toPrepend.push("--watch");
 
         args = [...toPrepend, ...args];
-        NodeSpace.term.logBlue("Source watching enabled. Set 'NODE_ENV' env variable to 'production' to disable it.");
-        console.log("(set 'NODE_ENV' environment variable to 'product' to disable it)");
+        NodeSpace.term.logBlue("Source watching enabled.");
     }
 
     if (mustLog) console.log("Jopi - Use current working dir:", cwd);
@@ -327,14 +326,25 @@ function tryOpenWS(port: number): Promise<void> {
 }
 
 async function startWebSocket(): Promise<string|undefined> {
+    // Allow forcing the url, which is needed for docker env.
+    if (process.env.JOPIN_WEBSOCKET_PORT) {
+        let port = parseInt(process.env.JOPIN_WEBSOCKET_PORT);
+
+        try {
+            await tryOpenWS(port);
+            return "ws://127.0.0.1:" + port;
+        }
+        catch {
+            throw "Can't use port " + port + " for websocket. See env var JOPIN_WEBSOCKET_PORT."
+        }
+    }
+
     for (let port=5100;port<5400;port++) {
         try {
             await tryOpenWS(port);
-            //console.log("Port accepted: " + port);
-            return "ws://127.0.0.1:" + port
+            return "ws://127.0.0.1:" + port;
         }
         catch {
-            //console.log("Port", port, "is ko");
         }
     }
 

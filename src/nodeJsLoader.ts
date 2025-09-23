@@ -74,7 +74,6 @@ export async function doNodeJsResolve(specifier: string, context: any, nextResol
 // noinspection JSUnusedGlobalSymbols
 export async function doNodeJsLoad(url: string, context: any, nextLoad: any) {
     if (context.format==="jopi-loader") {
-        debugger;
         let idx = url.indexOf("?");
         let options = "";
 

@@ -15,7 +15,11 @@ let mustLog = false; // Set env var JOPI_LOG to 1 to enable.
 interface WatchInfos {
     needWatch: boolean;
     needHot?: boolean;
+
     hasJopiWatchTask?: boolean;
+    hasJopiWatchTask_node?: boolean;
+    hasJopiWatchTask_bun?: boolean;
+
     packageJsonFilePath?: string;
 }
 
@@ -113,9 +117,9 @@ export async function jopiLauncherTool(jsEngine: string) {
                 if (json.scripts) {
                     let scripts = json.scripts;
 
-                    if (scripts.jopiWatch) {
-                        res.hasJopiWatchTask = true;
-                    }
+                    if (scripts.jopiWatch) res.hasJopiWatchTask = true;
+                    if (scripts.jopiWatch_node) res.hasJopiWatchTask_node = true;
+                    if (scripts.jopiWatch_bun) res.hasJopiWatchTask_bun = true;
                 }
             }
             catch (e) {
@@ -230,10 +234,17 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     spawnChild(mainSpawnParams);
 
-    if (gIsDevMode && config.hasJopiWatchTask) {
-        let cwd = path.dirname(config.packageJsonFilePath!);
-        cmd = jsEngine=="node" ? "npm": "bun";
-        spawnChild({cmd, env, cwd, args: ["run", "jopiWatch"], killOnExit: false})
+    if (gIsDevMode) {
+        function execTask(taskName: string) {
+            let cwd = path.dirname(config.packageJsonFilePath!);
+            cmd = isNodeJs ? "npm" : "bun";
+            spawnChild({cmd, env, cwd, args: ["run", taskName], killOnExit: false})
+        }
+
+        let isNodeJs = jsEngine == "node";
+        if (config.hasJopiWatchTask) execTask("jopiWatch");
+        if (isNodeJs && config.hasJopiWatchTask_node) execTask("jopiWatch_node");
+        if (!isNodeJs && config.hasJopiWatchTask_bun) execTask("jopiWatch_bun");
     }
 }
 

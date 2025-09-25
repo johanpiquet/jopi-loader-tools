@@ -1,6 +1,6 @@
 {
   "name": "@jopi-loader/tools",
-  "version": "1.0.33",
+  "version": "1.0.35",
   "private": false,
   "license": "MIT",
   "description": "Tools for jopi-loader",
@@ -44,5 +44,5 @@
     "ws": "^8.18.3"
   },
   "nodeSwitch": true,
-  "nodeSwitch-default": "node"
+  "nodeSwitch-default": "node","publishedDate": "9/25/2025","publicPublishedDate": "9/25/2025"
 }

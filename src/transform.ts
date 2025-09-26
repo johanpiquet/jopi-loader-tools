@@ -50,26 +50,30 @@ async function transform_cssModule(filePath: string) {
 }
 
 async function transform_css(filePath: string) {
-    return `const __PATH__ = ${JSON.stringify(filePath)};
-if (global.jopiOnCssImported) global.jopiOnCssImported(__PATH__);
-export default __PATH__;`
+    let resUrl = await getAndInstallResourcePath(filePath);
+
+    return `const __PATH__ = ${JSON.stringify(resUrl)};
+if (global.jopiOnCssImported) global.jopiOnCssImported(${JSON.stringify(filePath)});
+export default ${JSON.stringify(resUrl)};`
 }
 
-async function transform_filePath(sourceFilePath: string) {
+async function getAndInstallResourcePath(sourceFilePath: string) {
     const config = getTransformConfig();
-    let resUrl: string;
 
     if (config && config.webSiteUrl) {
         let fileExtension = path.extname(sourceFilePath);
         let fileNameWithoutExt = path.basename(sourceFilePath).slice(0, -fileExtension.length);
         let targetFileName = fileNameWithoutExt + '-' + getAssetsHash() + fileExtension;
 
-        resUrl = config.webSiteUrl + config.webResourcesRoot + targetFileName;
         await installResourceToBundlerDir(sourceFilePath, targetFileName);
+        return config.webSiteUrl + config.webResourcesRoot + targetFileName;
     } else {
-        resUrl = sourceFilePath;
+        return sourceFilePath;
     }
+}
 
+async function transform_filePath(sourceFilePath: string) {
+    let resUrl = await getAndInstallResourcePath(sourceFilePath);
     return `const __PATH__ = ${JSON.stringify(resUrl)}; export default __PATH__;`;
 }
 

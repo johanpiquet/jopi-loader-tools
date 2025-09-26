@@ -135,9 +135,17 @@ async function transform_inline(filePath: string) {
     return `export default ${JSON.stringify(resText)};`
 }
 
+let gIsBundleDireReset = false;
+
 async function installResourceToBundlerDir(resFilePath: string, destFileName: string) {
     if (!gTransformConfig || !gTransformConfig.bundlerOutputDir) return;
     let outputDir = gTransformConfig.bundlerOutputDir;
+
+    if (!gIsBundleDireReset) {
+        gIsBundleDireReset = true;
+        await nFS.rmDir(outputDir);
+        await nFS.mkDir(outputDir);
+    }
 
     await fs.mkdir(outputDir, { recursive: true });
     let destFilePath = path.join(outputDir, destFileName);

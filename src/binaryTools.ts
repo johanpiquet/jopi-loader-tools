@@ -178,6 +178,9 @@ export async function jopiLauncherTool(jsEngine: string) {
         preloadArgs.push(pkg);
     });
 
+    preloadArgs.push("--loader", "jopi-loader/loader");
+    preloadArgs.push("--no-warnings");
+
     //TODO: fast checking of process.argv[0] to speed it upd.
     let cmd = findExecutable(jsEngine, jsEngine)!;
     if (mustLog) console.log("Jopi - Using " + jsEngine + " from:", cmd);

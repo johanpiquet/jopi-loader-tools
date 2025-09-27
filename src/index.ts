@@ -8,3 +8,4 @@ export * from "./config.ts";
 
 export {findExecutable, findPackageJson} from "./tools.ts"
 export * from "./binaryTools.ts"
+export * from "./nodeJsAliasLoader.js";

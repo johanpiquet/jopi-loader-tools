@@ -20,7 +20,6 @@
   "scripts": {
     "build": "npx tsc",
     "tsc": "npx tsc",
-
     "bun-publish": "npx tsc && bun publish",
     "untrack": "git rm -r --cached -- ./dist/**;"
   },
@@ -34,15 +33,18 @@
     "@jopi-loader/types": "workspace:^"
   },
   "dependencies": {
+    "@jopi-loader/client": "workspace:^",
     "chokidar": "^4.0.3",
     "esbuild": "^0.25.9",
     "jopi-node-space": "workspace:^",
-    "@jopi-loader/client": "workspace:^",
     "postcss": "^8.5.6",
     "postcss-modules": "^6.0.1",
     "sass": "^1.90.0",
+    "strip-json-comments": "^5.0.3",
     "ws": "^8.18.3"
   },
   "nodeSwitch": true,
-  "nodeSwitch-default": "node","publishedDate": "9/25/2025","publicPublishedDate": "9/25/2025"
+  "nodeSwitch-default": "node",
+  "publishedDate": "9/25/2025",
+  "publicPublishedDate": "9/25/2025"
 }

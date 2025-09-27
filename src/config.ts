@@ -97,7 +97,9 @@ export function getImportTransformConfig(): PackageJson_jopi {
                     gTransformConfig.inlineMaxSize_ko = jopi.inlineMaxSize_ko || INLINE_MAX_SIZE_KO;
                 }
 
-                bundlerOutputDir = webResourcesRoot.bundlerOutputDir;
+                if (webResourcesRoot.bundlerOutputDir) {
+                    bundlerOutputDir = webResourcesRoot.bundlerOutputDir;
+                }
             }
         } catch {
         }

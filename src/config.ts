@@ -61,62 +61,70 @@ export function getImportTransformConfig(): PackageJson_jopi {
     }
 
     if (gTransformConfig!==undefined) return gTransformConfig;
-    let pkgJson = findPackageJson();
+    let pkgJsonFilePath = findPackageJson();
 
-    if (pkgJson) {
+    let bundlerOutputDir = "./temp/.reactHydrateCache";
+
+    gTransformConfig =  {
+        webResourcesRoot: "_bundle",
+        inlineMaxSize_ko: INLINE_MAX_SIZE_KO,
+        bundlerOutputDir: ""
+    }
+
+    if (pkgJsonFilePath) {
         try {
-            let json = JSON.parse(NodeSpace.fs.readTextSyncFromFile(pkgJson));
+            let json = JSON.parse(NodeSpace.fs.readTextSyncFromFile(pkgJsonFilePath));
             let jopi = json.jopi;
 
             if (jopi) {
                 let webSiteUrl = jopi.webSiteUrl;
                 if (webSiteUrl && !webSiteUrl.endsWith("/")) webSiteUrl += '/';
+                //
+                gTransformConfig.webSiteUrl = webSiteUrl;
 
                 let webSiteListeningUrl = jopi.webSiteListeningUrl;
-                if (!webSiteListeningUrl) webSiteListeningUrl = webSiteUrl;
                 if (webSiteListeningUrl && !webSiteListeningUrl.endsWith("/")) webSiteListeningUrl += '/';
+                //
+                gTransformConfig.webSiteListeningUrl = webSiteListeningUrl;
 
-                let root = jopi.webResourcesRoot || "_bundle";
-                if (root[0]==='/') root = root.substring(1);
-                if (!root.endsWith("/")) root += "/";
-
-                let inlineMaxSize_ko = INLINE_MAX_SIZE_KO;
+                let webResourcesRoot = jopi.webResourcesRoot || "_bundle";
+                if (webResourcesRoot[0]==='/') webResourcesRoot = webResourcesRoot.substring(1);
+                if (!webResourcesRoot.endsWith("/")) webResourcesRoot += "/";
+                //
+                gTransformConfig.webResourcesRoot = webResourcesRoot;
 
                 if (typeof(jopi.inlineMaxSize_ko)=="number") {
-                    inlineMaxSize_ko = jopi.inlineMaxSize_ko;
+                    gTransformConfig.inlineMaxSize_ko = jopi.inlineMaxSize_ko || INLINE_MAX_SIZE_KO;
                 }
 
-                let bundlerOutputDir = root.bundlerOutputDir;
-                //
-                if (!bundlerOutputDir) {
-                    bundlerOutputDir = "./temp/.reactHydrateCache";
-                }
-
-                if (path.sep!=="/") {
-                    bundlerOutputDir = bundlerOutputDir.replaceAll("/", path.sep);
-                }
-
-                if (webSiteUrl) {
-                    bundlerOutputDir = path.join(bundlerOutputDir, urlToPath(webSiteUrl));
-                }
-
-                bundlerOutputDir = path.resolve(bundlerOutputDir);
-
-                gTransformConfig = {
-                    webSiteUrl, webSiteListeningUrl,
-                    webResourcesRoot: root,
-                    inlineMaxSize_ko,
-                    bundlerOutputDir
-                };
+                bundlerOutputDir = webResourcesRoot.bundlerOutputDir;
             }
         } catch {
         }
-    } else {
-        gTransformConfig =  {
-            webResourcesRoot: "_bundle",
-            inlineMaxSize_ko: INLINE_MAX_SIZE_KO,
-            bundlerOutputDir: "./temp/.reactHydrateCache"
+    }
+
+    if (process.env.JOPI_WEBSITE_URL) {
+        gTransformConfig.webSiteUrl = process.env.JOPI_WEBSITE_URL;
+    }
+
+    if (process.env.JOPI_WEBSITE_LISTENING_URL) {
+        gTransformConfig.webSiteListeningUrl = process.env.JOPI_WEBSITE_LISTENING_URL;
+    }
+
+    if (!gTransformConfig.webSiteListeningUrl) {
+        gTransformConfig.webSiteListeningUrl = gTransformConfig.webSiteUrl;
+    } else if (!gTransformConfig.webSiteUrl) {
+        gTransformConfig.webSiteUrl = gTransformConfig.webSiteListeningUrl;
+    }
+
+    if (bundlerOutputDir && gTransformConfig.webSiteUrl) {
+        if (path.sep !== "/") {
+            bundlerOutputDir = bundlerOutputDir.replaceAll("/", path.sep);
         }
+
+        bundlerOutputDir = path.resolve(bundlerOutputDir);
+        bundlerOutputDir = path.join(bundlerOutputDir, urlToPath(gTransformConfig.webSiteUrl));
+        gTransformConfig.bundlerOutputDir = bundlerOutputDir;
     }
 
     return gTransformConfig!;

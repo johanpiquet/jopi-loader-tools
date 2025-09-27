@@ -9,8 +9,20 @@ export interface PackageJson_jopi {
      * When importing a file, if this option is set, then
      * we will not return a file path on the filesystem
      * but an url pointing to this resource.
+     *
+     * The value here must be the PUBLIC url.
      */
-    webSiteUrl: string;
+    webSiteUrl?: string;
+
+    /**
+     * It's the url on which the website listens if we don't use
+     * explicite url when defining the website.
+     *
+     * Here it's the PRIVATE url.
+     *
+     * If not defined, take the value of webSiteUrl.
+     */
+    webSiteListeningUrl?: string;
 
     /**
      * Is used with `webSiteUrl` to known where
@@ -37,25 +49,9 @@ export interface PackageJson_jopi {
 
 export const INLINE_MAX_SIZE_KO = 10;
 
-let gTransformConfig: PackageJson_jopi|undefined|null;
+let gTransformConfig: PackageJson_jopi|undefined;
 
-export function getDefaultWebSiteUrl(throwErrorIfUnset = true): string {
-    let config = getImportTransformConfig();
-
-    if (!config || !config.webSiteUrl) {
-        if (throwErrorIfUnset) {
-            throw new Error(
-                "You must set the webSiteUrl in the package.json file, section 'jopi'"
-            )
-        }
-
-        return "";
-    }
-
-    return config.webSiteUrl;
-}
-
-export function getImportTransformConfig(): PackageJson_jopi|null {
+export function getImportTransformConfig(): PackageJson_jopi {
     function urlToPath(url: string) {
         let urlInfos = new URL(url);
         let port = urlInfos.port;
@@ -72,9 +68,13 @@ export function getImportTransformConfig(): PackageJson_jopi|null {
             let json = JSON.parse(NodeSpace.fs.readTextSyncFromFile(pkgJson));
             let jopi = json.jopi;
 
-            if (jopi && jopi.webSiteUrl) {
-                let url = jopi.webSiteUrl;
-                if (!url.endsWith("/")) url += '/';
+            if (jopi) {
+                let webSiteUrl = jopi.webSiteUrl;
+                if (webSiteUrl && !webSiteUrl.endsWith("/")) webSiteUrl += '/';
+
+                let webSiteListeningUrl = jopi.webSiteListeningUrl;
+                if (!webSiteListeningUrl) webSiteListeningUrl = webSiteUrl;
+                if (webSiteListeningUrl && !webSiteListeningUrl.endsWith("/")) webSiteListeningUrl += '/';
 
                 let root = jopi.webResourcesRoot || "_bundle";
                 if (root[0]==='/') root = root.substring(1);
@@ -96,14 +96,14 @@ export function getImportTransformConfig(): PackageJson_jopi|null {
                     bundlerOutputDir = bundlerOutputDir.replaceAll("/", path.sep);
                 }
 
-                if (url) {
-                    bundlerOutputDir = path.join(bundlerOutputDir, urlToPath(url));
+                if (webSiteUrl) {
+                    bundlerOutputDir = path.join(bundlerOutputDir, urlToPath(webSiteUrl));
                 }
 
                 bundlerOutputDir = path.resolve(bundlerOutputDir);
 
-                return gTransformConfig = {
-                    webSiteUrl: url,
+                gTransformConfig = {
+                    webSiteUrl, webSiteListeningUrl,
                     webResourcesRoot: root,
                     inlineMaxSize_ko,
                     bundlerOutputDir
@@ -111,7 +111,13 @@ export function getImportTransformConfig(): PackageJson_jopi|null {
             }
         } catch {
         }
+    } else {
+        gTransformConfig =  {
+            webResourcesRoot: "_bundle",
+            inlineMaxSize_ko: INLINE_MAX_SIZE_KO,
+            bundlerOutputDir: "./temp/.reactHydrateCache"
+        }
     }
 
-    return gTransformConfig = null;
+    return gTransformConfig!;
 }

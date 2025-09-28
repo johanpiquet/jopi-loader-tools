@@ -127,7 +127,7 @@ let gPackageJsonPath: string|null|undefined;
 export function findPackageJson(): string|null {
     if (gPackageJsonPath!==undefined) return gPackageJsonPath;
 
-    let currentDir = process.cwd();
+    let currentDir = getCodeSourceDirHint();
 
     while (true) {
         const packagePath = path.join(currentDir, 'package.json');
@@ -143,6 +143,17 @@ export function findPackageJson(): string|null {
     }
 
     return null;
+}
+
+let gCodeSourceDirHint: string|undefined = process.cwd();
+
+export function setCodeSourceDirHint(dirHint: string) {
+    gCodeSourceDirHint = dirHint;
+}
+
+export function getCodeSourceDirHint() {
+    if (!gCodeSourceDirHint) return process.cwd();
+    return gCodeSourceDirHint;
 }
 
 /**

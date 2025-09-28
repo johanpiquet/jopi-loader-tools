@@ -56,8 +56,8 @@ async function initialize() {
                 pathAlias = resolvePath(rootDir, pathAlias);
             }
 
+            if (!alias.endsWith("/")) alias += "/";
             if (!pathAlias.endsWith("/")) pathAlias += "/";
-
 
             declaredAliases[alias] = pathAlias;
         }
@@ -76,21 +76,29 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
         await initialize();
     }
 
+    let foundAlias = "";
+
     for (const alias in declaredAliases) {
         if (specifier.startsWith(alias)) {
-            let pathAlias = declaredAliases[alias];
-            const resolvedPath = specifier.replace(alias, pathAlias);
-
-            // Add .js if missing.
-            const filePath = resolvedPath.endsWith('.js') ? resolvedPath : `${resolvedPath}.js`;
-
-            let parentPath = fileURLToPath(context.parentURL!);
-            parentPath = await searchSourceOf(parentPath);
-
-            const relPath = path.relative(dirname(parentPath), filePath);
-
-            return nextResolve(relPath, context);
+            if (foundAlias.length<alias.length) {
+                foundAlias = alias;
+            }
         }
+    }
+
+    if (foundAlias) {
+        let pathAlias = declaredAliases[foundAlias];
+        const resolvedPath = specifier.replace(foundAlias, pathAlias);
+
+        // Add .js if missing.
+        const filePath = resolvedPath.endsWith('.js') ? resolvedPath : `${resolvedPath}.js`;
+
+        let parentPath = fileURLToPath(context.parentURL!);
+        parentPath = await searchSourceOf(parentPath);
+
+        const relPath = path.relative(dirname(parentPath), filePath);
+
+        return nextResolve(relPath, context);
     }
 
     return nextResolve(specifier, context);

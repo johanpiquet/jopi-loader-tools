@@ -1,17 +1,21 @@
-import {isFile, searchSourceOf} from "./tools.ts";
 import path from "node:path";
 import * as sass from "sass";
 import fs from "node:fs/promises";
 import postcssModules from "postcss-modules";
 import postcss from "postcss";
 
+import NodeSpace from "jopi-node-space";
+const nFS = NodeSpace.fs;
+
 /**
  * Compile a CSS or SCSS file to a JavaScript file.
  */
 export default async function compileScss(filePath: string): Promise<string> {
     // Occurs when it's compiled with TypeScript.
-    if (!await isFile(filePath)) {
-        filePath = await searchSourceOf(filePath);
+    if (!await nFS.isFile(filePath)) {
+        let source = NodeSpace.app.searchSourceOf(filePath)!;
+        if (!source) throw new Error(`Source not found for file not found: ${filePath}`);
+        filePath = source;
     }
 
     const ext = path.extname(filePath).toLowerCase();

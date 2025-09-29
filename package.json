@@ -1,6 +1,6 @@
 {
   "name": "@jopi-loader/tools",
-  "version": "1.0.35",
+  "version": "1.0.36",
   "private": false,
   "license": "MIT",
   "description": "Tools for jopi-loader",
@@ -21,7 +21,8 @@
     "build": "npx tsc",
     "tsc": "npx tsc",
     "bun-publish": "npx tsc && bun publish",
-    "untrack": "git rm -r --cached -- ./dist/**;"
+    "untrack": "git rm -r --cached -- ./dist/**;",
+    "clean": "rm -rf ./dist; rm -rf .turbo; rm tsconfig.tsbuildinfo"
   },
   "publishConfig": {
     "access": "public"
@@ -45,6 +46,6 @@
   },
   "nodeSwitch": true,
   "nodeSwitch-default": "node",
-  "publishedDate": "9/25/2025",
+  "publishedDate": "9/29/2025",
   "publicPublishedDate": "9/25/2025"
 }

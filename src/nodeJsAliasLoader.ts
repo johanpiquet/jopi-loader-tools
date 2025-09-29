@@ -2,10 +2,9 @@ import path from "node:path";
 import {dirname, resolve as resolvePath} from "path";
 import {fileURLToPath} from "url";
 import type { ResolveHook, ResolveFnOutput } from 'node:module';
-import {findPackageJson, searchSourceOf} from "./tools.js";
 import stripJsonComments from 'strip-json-comments';
 
-import "jopi-node-space";
+import NodeSpace from "jopi-node-space";
 const nFS = NodeSpace.fs;
 
 const declaredAliases: Record<string, string> = {
@@ -17,7 +16,7 @@ let rootDir = "";
 async function initialize() {
     gIsInitialized = true;
 
-    let pkgJsonFile = findPackageJson();
+    let pkgJsonFile = NodeSpace.app.findPackageJson();
     if (!pkgJsonFile) throw new Error("Package.json not found");
 
     let pkgJsonDir = path.dirname(pkgJsonFile);
@@ -94,7 +93,7 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
         const filePath = resolvedPath.endsWith('.js') ? resolvedPath : `${resolvedPath}.js`;
 
         let parentPath = fileURLToPath(context.parentURL!);
-        parentPath = await searchSourceOf(parentPath);
+        parentPath = NodeSpace.app.requireSourceOf(parentPath);
 
         const relPath = path.relative(dirname(parentPath), filePath);
 

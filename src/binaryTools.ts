@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import {WebSocket, WebSocketServer} from 'ws';
-import {findExecutable, findPackageJson} from "./tools.js";
 import {type ChildProcess, spawn} from "node:child_process";
 import path from "node:path";
+import NodeSpace from "jopi-node-space";
 
 // *************************
 const FORCE_LOG = false;
@@ -53,7 +53,7 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     function getPreloadModules() {
-        const packageJsonPath = findPackageJson();
+        const packageJsonPath = NodeSpace.app.findPackageJson();
 
         if (!packageJsonPath) {
             return [];
@@ -90,7 +90,7 @@ export async function jopiLauncherTool(jsEngine: string) {
             needHot: gIsDevMode && (jsEngine==="bun")
         };
 
-        let pckJson = findPackageJson();
+        let pckJson = NodeSpace.app.findPackageJson();
 
         if (pckJson) {
             if (mustLog) console.log("Jopi - package.json file found at", pckJson);
@@ -181,8 +181,7 @@ export async function jopiLauncherTool(jsEngine: string) {
     preloadArgs.push("--loader", "jopi-loader/loader");
     preloadArgs.push("--no-warnings");
 
-    //TODO: fast checking of process.argv[0] to speed it upd.
-    let cmd = findExecutable(jsEngine, jsEngine)!;
+    let cmd = NodeSpace.os.whichSync(jsEngine, jsEngine)!;
     if (mustLog) console.log("Jopi - Using " + jsEngine + " from:", cmd);
     let args = [...preloadArgs, ...argv];
 

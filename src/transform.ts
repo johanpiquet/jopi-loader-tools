@@ -3,7 +3,7 @@ import {supportedExtensionToType} from "./rules.ts";
 import path from "node:path";
 import fs from "node:fs/promises";
 
-import "jopi-node-space";
+import NodeSpace from "jopi-node-space";
 import {getAssetsHash} from "@jopi-loader/client";
 import {getImportTransformConfig, INLINE_MAX_SIZE_KO} from "./config.ts";
 

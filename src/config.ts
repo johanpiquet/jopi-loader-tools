@@ -1,5 +1,5 @@
-import {findPackageJson} from "./tools.ts";
 import path from "node:path";
+import NodeSpace from "jopi-node-space";
 
 /**
  * The value of the "jopi" entry in package.json
@@ -61,7 +61,7 @@ export function getImportTransformConfig(): PackageJson_jopi {
     }
 
     if (gTransformConfig!==undefined) return gTransformConfig;
-    let pkgJsonFilePath = findPackageJson();
+    let pkgJsonFilePath = NodeSpace.app.findPackageJson();
 
     let bundlerOutputDir = "./temp/.reactHydrateCache";
 

@@ -1,7 +1,7 @@
 import path from "node:path";
 import {spawn, ChildProcess} from "node:child_process";
 import chokidar from "chokidar";
-import "jopi-node-space";
+import NodeSpace from "jopi-node-space";
 
 export interface SourceChangesWatcherParams {
     watchDirs: string[];

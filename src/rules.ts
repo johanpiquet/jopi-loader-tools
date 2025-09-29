@@ -1,4 +1,4 @@
-import "jopi-node-space";
+import NodeSpace from "jopi-node-space";
 
 function toFlatList(rec: Record<string, string[]>): string[] {
     let res: string[] = [];

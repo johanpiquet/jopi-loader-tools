@@ -1,9 +1,11 @@
 import cssModuleCompiler from "./cssModuleCompiler.ts";
-import {isFile, searchSourceOf} from "./tools.ts";
 import {transformFile} from "./transform.ts";
 import {getImportTransformConfig} from "./config.ts";
 import path from "node:path";
 import fs from "node:fs";
+import NodeSpace from "jopi-node-space";
+
+const nFS = NodeSpace.fs;
 
 // Note: Bun.js plugins are partially compatible with EsBuild modules.
 
@@ -23,8 +25,8 @@ async function processCssModule(path: string) {
 
 async function inlineAndRawModuleHandler(options: string, resPath: string) {
     // Occurs when it's compiled with TypeScript.
-    if (!await isFile(resPath)) {
-        resPath = await searchSourceOf(resPath);
+    if (!await nFS.isFile(resPath)) {
+        resPath = NodeSpace.app.requireSourceOf(resPath);
     }
 
     let res = await transformFile(resPath, options);
@@ -59,7 +61,7 @@ function createJopiRawFile(targetFilePath: string, processType: string): any {
     // Also, there are strange behaviors that we avoid when using this strategy.
 
     let options = getImportTransformConfig();
-    let tempDir = options?.bundlerOutputDir || path.join("temp", "bunjs");
+    let tempDir = options?.bundlerOutputDir || path.join(NodeSpace.app.getTempDir(), "bunjs");
     fs.mkdirSync(tempDir, {recursive: true});
 
     let fileName = path.resolve(tempDir, (gNextTempFileName++) + ".jopiraw");

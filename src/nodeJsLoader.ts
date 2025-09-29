@@ -1,13 +1,14 @@
-import "jopi-node-space";
+import NodeSpace from "jopi-node-space";
 import {fileURLToPath} from "node:url";
 import path from "node:path";
-import {isFile, searchSourceOf} from "./tools.ts";
 import {supportedExtensions} from "./rules.ts";
 import {transformFile} from "./transform.ts";
 
+const nFS = NodeSpace.fs;
+
 export async function doNodeJsResolve(specifier: string, context: any, nextResolve: any) {
     async function tryResolveFile(filePath: string, moduleName: string) {
-        if (await isFile(filePath)) {
+        if (await nFS.isFile(filePath)) {
             return nextResolve(moduleName, context);
         }
 
@@ -85,8 +86,8 @@ export async function doNodeJsLoad(url: string, context: any, nextLoad: any) {
         let filePath = fileURLToPath(url);
 
         // Occurs when it's compiled with TypeScript.
-        if (!await isFile(filePath)) {
-            filePath = await searchSourceOf(filePath);
+        if (!await nFS.isFile(filePath)) {
+            filePath = NodeSpace.app.requireSourceOf(filePath);
         }
 
         try {

@@ -3,14 +3,6 @@ import NodeSpace from "jopi-node-space";
 
 import fss from "node:fs";
 
-
-/**
- * Convert a simple win32 path to a linux path.
- */
-export function convertWin32ToLinuxPath(filePath: string) {
-    return filePath.replace(/\\/g, '/');
-}
-
 /**
  * Search the entry point of the current package (ex: ./dist/index.json)
  * @param nodePackageDir - The path of the current module.

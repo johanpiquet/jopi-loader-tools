@@ -5,6 +5,8 @@ import type { ResolveHook, ResolveFnOutput } from 'node:module';
 import stripJsonComments from 'strip-json-comments';
 
 import NodeSpace from "jopi-node-space";
+import {pathToFileURL} from "node:url";
+import {getCompiledFilePathFor} from "jopi-node-space/dist/_app.js";
 const nFS = NodeSpace.fs;
 
 const declaredAliases: Record<string, string> = {
@@ -65,6 +67,8 @@ async function initialize() {
 
 let gIsInitialized = false;
 
+const LOG = process.env.JOPI_LOGS === "1";
+
 /**
  * Allows resolving alias.
  * Example: import myComp from "@/lib/myComp".
@@ -86,18 +90,15 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
     }
 
     if (foundAlias) {
+        if (LOG) console.log(`jopi-loader - Found alias ${foundAlias} for resource ${specifier}`);
+
         let pathAlias = declaredAliases[foundAlias];
         const resolvedPath = specifier.replace(foundAlias, pathAlias);
 
-        // Add .js if missing.
-        const filePath = resolvedPath.endsWith('.js') ? resolvedPath : `${resolvedPath}.js`;
+        let filePath = resolvedPath.endsWith('.js') ? resolvedPath : `${resolvedPath}.js`;
+        filePath = getCompiledFilePathFor(filePath);
 
-        let parentPath = fileURLToPath(context.parentURL!);
-        parentPath = NodeSpace.app.requireSourceOf(parentPath);
-
-        const relPath = path.relative(dirname(parentPath), filePath);
-
-        return nextResolve(relPath, context);
+        return nextResolve(pathToFileURL(filePath).href, context);
     }
 
     return nextResolve(specifier, context);

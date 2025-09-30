@@ -25,10 +25,12 @@ interface WatchInfos {
 
 function checkIfDevMode() {
     const idx = process.argv.indexOf("--jopi-dev");
-    if (idx===-1) return false;
+    if (idx!==-1) {
+        process.argv.splice(idx, 1);
+        return true;
+    }
 
-    process.argv.splice(idx, 1);
-    return true;
+    return process.env.JOPI_DEV === "1";
 }
 
 export async function jopiLauncherTool(jsEngine: string) {
@@ -178,8 +180,10 @@ export async function jopiLauncherTool(jsEngine: string) {
         preloadArgs.push(pkg);
     });
 
-    preloadArgs.push("--loader", "jopi-loader/loader");
-    preloadArgs.push("--no-warnings");
+    if (jsEngine==="node") {
+        preloadArgs.push("--loader", "jopi-loader/loader");
+        preloadArgs.push("--no-warnings");
+    }
 
     let cmd = NodeSpace.os.whichSync(jsEngine, jsEngine)!;
     if (mustLog) console.log("Jopi - Using " + jsEngine + " from:", cmd);

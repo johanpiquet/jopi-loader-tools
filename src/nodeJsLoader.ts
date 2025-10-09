@@ -1,109 +1,129 @@
-import NodeSpace from "jopi-node-space";
-import {fileURLToPath} from "node:url";
+import type { ResolveHook, ResolveFnOutput } from 'node:module';
+import { createRequire, findPackageJSON } from 'node:module';
+
+import {pathToFileURL} from "node:url";
+import {getCompiledFilePathFor} from "jopi-node-space/dist/_app.js";
+import {getPathAliasInfo, type PathAliasInfo} from "./tools.js";
+import fs from "node:fs/promises";
 import path from "node:path";
-import {supportedExtensions} from "./rules.ts";
-import {transformFile} from "./transform.ts";
 
-const nFS = NodeSpace.fs;
+//**********************************************************************************************************************
+// NodeJS RESOLVER vs LOADER
+//
+// Resolver is the new Node.js API for import resolving and processing.
+// But currently (Node v22) there is not a full support, and the old
+// mechanism (loader) must be used for some special cases.
+//
+//**********************************************************************************************************************
 
-export async function doNodeJsResolve(specifier: string, context: any, nextResolve: any) {
-    async function tryResolveFile(filePath: string, moduleName: string) {
-        if (await nFS.isFile(filePath)) {
-            return nextResolve(moduleName, context);
-        }
+const LOG = process.env.JOPI_LOGS === "1";
 
-        return undefined;
+let gRequire: NodeJS.Require|undefined;
+
+/**
+ * Using a loader (old API) allows doing thing not correctly supported by resolver (new API)
+ *
+ * 1- Resolving alias.
+ *      Example: import myComp from "@/lib/myComp".
+ *      The alias definitions are taken in the paths section of tsconfig.json.
+ *
+ * 2- Resolving import for an exposed file inside a module
+ *      Exemple:                import 'primereact/sidebar'
+ *      where the target is     import 'primereact/sidebar/index.mjs.js'
+ */
+export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextResolve): Promise<ResolveFnOutput> => {
+    if (specifier==="primereact/sidebar") debugger;
+
+    if (!gPathAliasInfos) {
+        gPathAliasInfos = await getPathAliasInfo();
     }
 
-    async function tryResolveDirectory(url: string) {
-        const basePath = fileURLToPath(url);
-        let basename = path.basename(basePath);
+    //region Resolve alias
 
-        let allFilesToTry = ["index.js", basename + ".cjs.js", basename + ".js"];
+    if (specifier[0]==='@') {
+        let foundAlias = "";
 
-        for (let fileToTry of allFilesToTry) {
-            const res = await tryResolveFile(path.join(basePath, fileToTry), specifier + "/" + fileToTry);
-            if (res) {
-                return res;
+        for (const alias in gPathAliasInfos.alias) {
+            if (specifier.startsWith(alias)) {
+                if (foundAlias.length < alias.length) {
+                    foundAlias = alias;
+                }
             }
         }
 
-        // Will throw an error.
-        return nextResolve(specifier, context);
-    }
+        if (foundAlias) {
+            if (LOG) console.log(`jopi-loader - Found alias ${foundAlias} for resource ${specifier}`);
 
-    async function tryResolveModule(url: string) {
-        const basePath = fileURLToPath(url);
+            let pathAlias = gPathAliasInfos.alias[foundAlias];
+            const resolvedPath = specifier.replace(foundAlias, pathAlias);
 
-        const res = await tryResolveFile(basePath + ".js", specifier + ".js");
+            let filePath = resolvedPath.endsWith('.js') ? resolvedPath : `${resolvedPath}.js`;
+            filePath = getCompiledFilePathFor(filePath);
 
-        if (res) {
-            return res;
+            return nextResolve(pathToFileURL(filePath).href, context);
         }
 
-        // Will throw an error.
-        return nextResolve(specifier, context);
+        // > Will continue on next cases.
     }
 
-    // Remove what is after the "?" to be able to test the extension.
+    //endregion
+
+    let mustProcess = specifier.includes("/");
+
+    if (mustProcess) {
+        if ((specifier[0] === '@') && specifier[1]!=='/') {
+            mustProcess = false;
+        } else if (specifier.indexOf(":")!==-1) {
+            mustProcess = false;
+        } else if (specifier.endsWith(".js") || specifier.endsWith(".mjs")) {
+            mustProcess = false;
+        }
+    }
+
+    // If we are here, it means we have possibly something like:
+    //      import "module/internalPath"
     //
-    const bckSpecifier = specifier;
-    let idx = specifier.indexOf("?");
-    if (idx!==-1) specifier = specifier.substring(0 ,idx);
-
-    if (supportedExtensions.includes(path.extname(specifier))) {
-        return {
-            url: new URL(bckSpecifier, context.parentURL).href,
-            format: "jopi-loader",
-            shortCircuit: true
-        };
-    }
-
-    try {
-        return nextResolve(specifier, context);
-    } catch (e: any) {
-        if (e.code === "ERR_UNSUPPORTED_DIR_IMPORT") {
-            return await tryResolveDirectory(e.url! as string);
-        }
-        if (e.code === "ERR_MODULE_NOT_FOUND") {
-            return await tryResolveModule(e.url! as string);
-        }
-        throw e;
-    }
-}
-
-// noinspection JSUnusedGlobalSymbols
-export async function doNodeJsLoad(url: string, context: any, nextLoad: any) {
-    if (context.format==="jopi-loader") {
-        let idx = url.indexOf("?");
-        let options = "";
-
-        if (idx !== -1) {
-            options = url.substring(idx + 1);
-            url = url.substring(0, idx);
-        }
-
-        let filePath = fileURLToPath(url);
-
-        // Occurs when it's compiled with TypeScript.
-        if (!await nFS.isFile(filePath)) {
-            filePath = NodeSpace.app.requireSourceOf(filePath);
+    // The matter is that the extension is missing, and Node.js doesn't handle this case
+    // despite UI lib used by Vite.js or WebPack.
+    //
+    if (mustProcess) {
+        if (!gRequire) {
+            gRequire = createRequire(context.parentURL!);
         }
 
         try {
-            let res = await transformFile(filePath, options);
+            //console.log("Testing", specifier);
 
-            return {
-                source: res.text,
-                format: 'module',
-                shortCircuit: true
-            };
+            // Testing nextResolve and catching exception don't work.
+            // It's why we use require.resolve to localize the package..
+            //
+            let found = gRequire.resolve(specifier);
+
+            if (found) {
+                const pkgPath = findPackageJSON(pathToFileURL(found));
+
+                if (pkgPath) {
+                    let pkgJson = await fs.readFile(pkgPath, "utf-8");
+                    const json = JSON.parse(pkgJson);
+
+                    if (json.module) {
+                        const oldName = specifier;
+                        specifier = path.resolve(path.dirname(pkgPath), json.module);
+                        if (LOG) console.log("Resolving", oldName, "to", specifier);
+                    }
+                }
+            }
+        } catch {
         }
-        catch (e: any) {
-            console.warn("jopi-loader - Error while loading:", e?.message || e);
-            throw "jopi-loader - error";
+
+        try {
+            nextResolve(specifier, context);
+        } catch (e) {
+            throw e;
         }
     }
 
-    return nextLoad(url, context);
+    return nextResolve(specifier, context);
 }
+
+let gPathAliasInfos: PathAliasInfo|undefined;

@@ -1,71 +1,8 @@
-import path from "node:path";
-import {dirname, resolve as resolvePath} from "path";
-import {fileURLToPath} from "url";
 import type { ResolveHook, ResolveFnOutput } from 'node:module';
-import stripJsonComments from 'strip-json-comments';
 
-import NodeSpace from "jopi-node-space";
 import {pathToFileURL} from "node:url";
 import {getCompiledFilePathFor} from "jopi-node-space/dist/_app.js";
-const nFS = NodeSpace.fs;
-
-const declaredAliases: Record<string, string> = {
-    //'@/lib/': 'src/shadcn/lib/',
-};
-
-let rootDir = "";
-
-async function initialize() {
-    gIsInitialized = true;
-
-    let pkgJsonFile = NodeSpace.app.findPackageJson();
-    if (!pkgJsonFile) throw new Error("Package.json not found");
-
-    let pkgJsonDir = path.dirname(pkgJsonFile);
-    rootDir = pkgJsonDir;
-
-    let tsconfigJsonPath = path.join(pkgJsonDir, "tsconfig.json");
-
-    if (!await nFS.isFile(tsconfigJsonPath)) {
-        throw new Error(`tsconfig.json not found at ${tsconfigJsonPath}`);
-    }
-
-    let asText = await nFS.readTextFromFile(tsconfigJsonPath);
-    let asJson = JSON.parse(stripJsonComments(asText));
-
-    let compilerOptions = asJson.compilerOptions;
-
-    if (compilerOptions) {
-        let paths = compilerOptions.paths;
-
-        /** Exemple
-         * "paths": {
-         *       "@/*": ["./src/shadcn/*"],
-         *       "@/lib/*": ["./src/shadcn/lib/*"],
-         *       "@/components/*": ["./src/shadcn/components/*"]
-         *     }
-         */
-
-        for (let alias in paths) {
-            let pathAlias = paths[alias].pop() as string;
-            if (!pathAlias) continue;
-
-            if (alias.endsWith("*")) alias = alias.substring(0, alias.length - 1);
-            if (pathAlias.endsWith("*")) pathAlias = pathAlias.substring(0, pathAlias.length - 1);
-
-            if (!path.isAbsolute(pathAlias)) {
-                pathAlias = resolvePath(rootDir, pathAlias);
-            }
-
-            if (!alias.endsWith("/")) alias += "/";
-            if (!pathAlias.endsWith("/")) pathAlias += "/";
-
-            declaredAliases[alias] = pathAlias;
-        }
-    }
-}
-
-let gIsInitialized = false;
+import {getPathAliasInfo, type PathAliasInfo} from "./tools.js";
 
 const LOG = process.env.JOPI_LOGS === "1";
 
@@ -75,13 +12,13 @@ const LOG = process.env.JOPI_LOGS === "1";
  * The alias definitions are taken in the paths section of tsconfig.json.
  */
 export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextResolve): Promise<ResolveFnOutput> => {
-    if (!gIsInitialized) {
-        await initialize();
+    if (!gPathAliasInfos) {
+        gPathAliasInfos = await getPathAliasInfo();
     }
 
     let foundAlias = "";
 
-    for (const alias in declaredAliases) {
+    for (const alias in gPathAliasInfos.alias) {
         if (specifier.startsWith(alias)) {
             if (foundAlias.length<alias.length) {
                 foundAlias = alias;
@@ -92,7 +29,7 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
     if (foundAlias) {
         if (LOG) console.log(`jopi-loader - Found alias ${foundAlias} for resource ${specifier}`);
 
-        let pathAlias = declaredAliases[foundAlias];
+        let pathAlias = gPathAliasInfos.alias[foundAlias];
         const resolvedPath = specifier.replace(foundAlias, pathAlias);
 
         let filePath = resolvedPath.endsWith('.js') ? resolvedPath : `${resolvedPath}.js`;
@@ -103,3 +40,5 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
 
     return nextResolve(specifier, context);
 }
+
+let gPathAliasInfos: PathAliasInfo|undefined;

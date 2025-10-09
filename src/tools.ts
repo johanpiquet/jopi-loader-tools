@@ -1,7 +1,9 @@
 import path from "node:path";
-import NodeSpace from "jopi-node-space";
+import NodeSpace, {nApp, nFS} from "jopi-node-space";
 
 import fss from "node:fs";
+import stripJsonComments from "strip-json-comments";
+import {resolve as resolvePath} from "path";
 
 /**
  * Search the entry point of the current package (ex: ./dist/index.json)
@@ -71,4 +73,67 @@ export function finNodePackageDir(packageName: string): string|null {
     }
 
     return null;
+}
+
+
+let gCache_getPathAliasInfo: PathAliasInfo|undefined;
+
+export interface PathAliasInfo {
+    rootDir: string;
+    alias: Record<string, string>
+}
+
+/**
+ * Return a dictionary of path alias (ex: import "@/ui/myComponent")
+ */
+export async function getPathAliasInfo(): Promise<PathAliasInfo> {
+    if (gCache_getPathAliasInfo) return gCache_getPathAliasInfo;
+
+    let pkgJsonFile = nApp.findPackageJson();
+    if (!pkgJsonFile) throw new Error("Package.json not found");
+
+    const rootDir = path.dirname(pkgJsonFile);
+
+    let tsconfigJsonPath = path.join(rootDir, "tsconfig.json");
+
+    if (!await nFS.isFile(tsconfigJsonPath)) {
+        throw new Error(`tsconfig.json not found at ${tsconfigJsonPath}`);
+    }
+
+    let asText = await nFS.readTextFromFile(tsconfigJsonPath);
+    let asJson = JSON.parse(stripJsonComments(asText));
+
+    let compilerOptions = asJson.compilerOptions;
+    let declaredAliases: Record<string, string> = {};
+
+    if (compilerOptions) {
+        let paths = compilerOptions.paths;
+
+        /** Exemple
+         * "paths": {
+         *       "@/*": ["./src/shadcn/*"],
+         *       "@/lib/*": ["./src/shadcn/lib/*"],
+         *       "@/components/*": ["./src/shadcn/components/*"]
+         *     }
+         */
+
+        for (let alias in paths) {
+            let pathAlias = paths[alias].pop() as string;
+            if (!pathAlias) continue;
+
+            if (alias.endsWith("*")) alias = alias.substring(0, alias.length - 1);
+            if (pathAlias.endsWith("*")) pathAlias = pathAlias.substring(0, pathAlias.length - 1);
+
+            if (!path.isAbsolute(pathAlias)) {
+                pathAlias = resolvePath(rootDir, pathAlias);
+            }
+
+            if (!alias.endsWith("/")) alias += "/";
+            if (!pathAlias.endsWith("/")) pathAlias += "/";
+
+            declaredAliases[alias] = pathAlias;
+        }
+    }
+
+    return gCache_getPathAliasInfo = {rootDir, alias: declaredAliases};
 }

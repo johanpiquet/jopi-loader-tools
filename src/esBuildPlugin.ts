@@ -3,9 +3,7 @@ import {transformFile} from "./transform.ts";
 import {getImportTransformConfig} from "./config.ts";
 import path from "node:path";
 import fs from "node:fs";
-import NodeSpace from "jopi-node-space";
-
-const nFS = NodeSpace.fs;
+import NodeSpace, {nFS} from "jopi-node-space";
 
 // Note: Bun.js plugins are partially compatible with EsBuild modules.
 
@@ -111,7 +109,7 @@ export function installEsBuildPlugins(build: Bun.PluginBuilder) {
     // @ts-ignore
     build.onLoad({filter: /\.jopiraw$/},  async (args) => {
         let json = JSON.parse(await NodeSpace.fs.readTextFromFile(args.path)) as JopiRawContent;
-        await NodeSpace.fs.unlink(args.path);
+        await nFS.unlink(args.path);
 
         let filePath = json.file;
 

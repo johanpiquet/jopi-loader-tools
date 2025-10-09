@@ -141,9 +141,10 @@ async function installResourceToBundlerDir(resFilePath: string, destFileName: st
 
     let outputDir = config.bundlerOutputDir;
 
-    if (!gIsBundleDireReset) {
-        gIsBundleDireReset = true;
-        await nFS.rmDir(outputDir);
+    if (!gIsBundleDirReset) {
+        gIsBundleDirReset = true;
+        // Disabled to allow bundler optilisations
+        //await nFS.rmDir(outputDir);
         await nFS.mkDir(outputDir);
     }
 
@@ -153,4 +154,4 @@ async function installResourceToBundlerDir(resFilePath: string, destFileName: st
     await fs.copyFile(resFilePath, destFilePath);
 }
 
-let gIsBundleDireReset = false;
+let gIsBundleDirReset = false;

@@ -75,7 +75,6 @@ export function finNodePackageDir(packageName: string): string|null {
     return null;
 }
 
-
 let gCache_getPathAliasInfo: PathAliasInfo|undefined;
 
 export interface PathAliasInfo {

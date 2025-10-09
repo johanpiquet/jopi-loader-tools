@@ -1,5 +1,5 @@
 import type { ResolveHook, ResolveFnOutput } from 'node:module';
-import { createRequire, findPackageJSON } from 'node:module';
+import nodeModule from 'node:module';
 
 import {pathToFileURL} from "node:url";
 import {getCompiledFilePathFor} from "jopi-node-space/dist/_app.js";
@@ -88,7 +88,7 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
     //
     if (mustProcess) {
         if (!gRequire) {
-            gRequire = createRequire(context.parentURL!);
+            gRequire = nodeModule.createRequire(context.parentURL!);
         }
 
         try {
@@ -100,7 +100,7 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
             let found = gRequire.resolve(specifier);
 
             if (found) {
-                const pkgPath = findPackageJSON(pathToFileURL(found));
+                const pkgPath = nodeModule.findPackageJSON(pathToFileURL(found));
 
                 if (pkgPath) {
                     let pkgJson = await fs.readFile(pkgPath, "utf-8");

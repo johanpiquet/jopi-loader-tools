@@ -147,9 +147,9 @@ async function installResourceToBundlerDir(resFilePath: string, destFileName: st
         await nFS.mkDir(outputDir);
     }
 
-    await fs.mkdir(outputDir, { recursive: true });
     let destFilePath = path.join(outputDir, destFileName);
 
+    await nFS.mkDir(nFS.dirname(destFilePath));
     await fs.copyFile(resFilePath, destFilePath);
 }
 

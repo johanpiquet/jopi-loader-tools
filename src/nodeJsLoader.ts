@@ -32,8 +32,6 @@ let gRequire: NodeJS.Require|undefined;
  *      where the target is     import 'primereact/sidebar/index.mjs.js'
  */
 export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextResolve): Promise<ResolveFnOutput> => {
-    if (specifier==="primereact/sidebar") debugger;
-
     if (!gPathAliasInfos) {
         gPathAliasInfos = await getPathAliasInfo();
     }

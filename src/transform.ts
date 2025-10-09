@@ -143,8 +143,7 @@ async function installResourceToBundlerDir(resFilePath: string, destFileName: st
 
     if (!gIsBundleDirReset) {
         gIsBundleDirReset = true;
-        // Disabled to allow bundler optilisations
-        //await nFS.rmDir(outputDir);
+        await nFS.rmDir(outputDir);
         await nFS.mkDir(outputDir);
     }
 

@@ -56,13 +56,29 @@ export async function doNodeJsResolve(specifier: string, context: any, nextResol
 
     // Remove what is after the "?" to be able to test the extension.
     //
-    const bckSpecifier = specifier;
     let idx = specifier.indexOf("?");
-    if (idx!==-1) specifier = specifier.substring(0 ,idx);
+    let options = "";
+
+    if (idx!==-1) {
+        options = specifier.substring(idx);
+        specifier = specifier.substring(0 ,idx);
+    }
 
     if (supportedExtensions.includes(path.extname(specifier))) {
+        const isRelative = specifier.startsWith("./") || specifier.startsWith("../");
+
+        let href: string;
+
+        if (!isRelative) {
+            let resolved = await nextResolve(specifier, context);
+            href = resolved.url;
+        }
+        else {
+            href = new URL(specifier, context.parentURL).href;
+        }
+
         return {
-            url: new URL(bckSpecifier, context.parentURL).href,
+            url: href + options,
             format: "jopi-loader",
             shortCircuit: true
         };

@@ -3,7 +3,7 @@ import {supportedExtensionToType} from "./rules.ts";
 import path from "node:path";
 import fs from "node:fs/promises";
 
-import NodeSpace from "jopi-node-space";
+import NodeSpace, {nApp} from "jopi-node-space";
 import {getAssetsHash} from "@jopi-loader/client";
 import {getImportTransformConfig, INLINE_MAX_SIZE_KO} from "./config.ts";
 
@@ -150,7 +150,14 @@ async function installResourceToBundlerDir(resFilePath: string, destFileName: st
     let destFilePath = path.join(outputDir, destFileName);
 
     await nFS.mkDir(nFS.dirname(destFilePath));
-    await fs.copyFile(resFilePath, destFilePath);
+    try {
+        resFilePath = nApp.requireSourceOf(resFilePath);
+        await fs.copyFile(resFilePath, destFilePath);
+    }
+    catch (e: any) {
+        console.warn("jopi-loader - Error while copying file", resFilePath, "to", destFilePath);
+        console.log(e?.message || e);
+    }
 }
 
 let gIsBundleDirReset = false;

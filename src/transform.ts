@@ -50,14 +50,14 @@ async function transform_cssModule(filePath: string) {
 }
 
 async function transform_css(filePath: string) {
-    let resUrl = await getAndInstallResourcePath(filePath);
+    let resUrl = await getResourceUrl(filePath);
 
     return `const __PATH__ = ${JSON.stringify(resUrl)};
 if (global.jopiOnCssImported) global.jopiOnCssImported(${JSON.stringify(filePath)});
 export default ${JSON.stringify(resUrl)};`
 }
 
-async function getAndInstallResourcePath(sourceFilePath: string) {
+async function getResourceUrl(sourceFilePath: string) {
     const config = getImportTransformConfig();
 
     if (config && config.webSiteUrl) {
@@ -65,7 +65,6 @@ async function getAndInstallResourcePath(sourceFilePath: string) {
         let fileNameWithoutExt = path.basename(sourceFilePath).slice(0, -fileExtension.length);
         let targetFileName = fileNameWithoutExt + '-' + getAssetsHash() + fileExtension;
 
-        await installResourceToBundlerDir(sourceFilePath, targetFileName);
         return config.webSiteUrl + config.webResourcesRoot + targetFileName;
     } else {
         return sourceFilePath;
@@ -73,7 +72,7 @@ async function getAndInstallResourcePath(sourceFilePath: string) {
 }
 
 async function transform_filePath(sourceFilePath: string) {
-    let resUrl = await getAndInstallResourcePath(sourceFilePath);
+    let resUrl = await getResourceUrl(sourceFilePath);
     return `const __PATH__ = ${JSON.stringify(resUrl)}; export default __PATH__;`;
 }
 
@@ -134,30 +133,3 @@ async function transform_inline(filePath: string) {
 
     return `export default ${JSON.stringify(resText)};`
 }
-
-async function installResourceToBundlerDir(resFilePath: string, destFileName: string) {
-    let config = getImportTransformConfig();
-    if (!config || !config.bundlerOutputDir) return;
-
-    let outputDir = config.bundlerOutputDir;
-
-    if (!gIsBundleDirReset) {
-        gIsBundleDirReset = true;
-        await nFS.rmDir(outputDir);
-        await nFS.mkDir(outputDir);
-    }
-
-    let destFilePath = path.join(outputDir, destFileName);
-
-    await nFS.mkDir(nFS.dirname(destFilePath));
-    try {
-        resFilePath = nApp.requireSourceOf(resFilePath);
-        await fs.copyFile(resFilePath, destFilePath);
-    }
-    catch (e: any) {
-        console.warn("jopi-loader - Error while copying file", resFilePath, "to", destFilePath);
-        console.log(e?.message || e);
-    }
-}
-
-let gIsBundleDirReset = false;

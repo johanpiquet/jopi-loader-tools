@@ -25,6 +25,13 @@ export interface PackageJson_jopi {
     webSiteListeningUrl?: string;
 
     /**
+     * Is similar to 'webResourcesRoot' but for the server side resources.
+     * The server will redirect the resources from this url to the final
+     * url resolved once bundled.
+     */
+    webResourcesRoot_SSR?: string;
+
+    /**
      * Is used with `webSiteUrl` to known where
      * whe cas found the resource. Will allow installing
      * a file server.
@@ -92,6 +99,7 @@ export function getImportTransformConfig(): PackageJson_jopi {
                 if (!webResourcesRoot.endsWith("/")) webResourcesRoot += "/";
                 //
                 gTransformConfig.webResourcesRoot = webResourcesRoot;
+                gTransformConfig.webResourcesRoot_SSR = webResourcesRoot.slice(0, -1) + "_s/";
 
                 if (typeof(jopi.inlineMaxSize_ko)=="number") {
                     gTransformConfig.inlineMaxSize_ko = jopi.inlineMaxSize_ko || INLINE_MAX_SIZE_KO;

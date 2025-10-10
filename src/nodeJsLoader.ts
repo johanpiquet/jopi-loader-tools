@@ -90,8 +90,6 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
         }
 
         try {
-            //console.log("Testing", specifier);
-
             // Testing nextResolve and catching exception don't work.
             // It's why we use require.resolve to localize the package..
             //
@@ -112,12 +110,6 @@ export const resolveNodeJsAlias: ResolveHook = async (specifier, context, nextRe
                 }
             }
         } catch {
-        }
-
-        try {
-            nextResolve(specifier, context);
-        } catch (e) {
-            throw e;
         }
     }
 

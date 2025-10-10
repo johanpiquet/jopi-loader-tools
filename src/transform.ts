@@ -3,11 +3,11 @@ import {supportedExtensionToType} from "./rules.ts";
 import path from "node:path";
 import fs from "node:fs/promises";
 
-import NodeSpace, {nApp} from "jopi-node-space";
-import {getAssetsHash} from "@jopi-loader/client";
+import NodeSpace from "jopi-node-space";
 import {getImportTransformConfig, INLINE_MAX_SIZE_KO} from "./config.ts";
 
 const nFS = NodeSpace.fs;
+const nCrypto = NodeSpace.crypto;
 
 export interface TransformResult {
     text: string;
@@ -49,31 +49,28 @@ async function transform_cssModule(filePath: string) {
     return await cssModuleCompiler(filePath);
 }
 
-async function transform_css(filePath: string) {
-    let resUrl = await getResourceUrl(filePath);
+async function transform_css(sourceFilePath: string) {
+    let resUrlInfos = await getResourceUrlInfos(sourceFilePath);
 
-    return `const __PATH__ = ${JSON.stringify(resUrl)};
-if (global.jopiOnCssImported) global.jopiOnCssImported(${JSON.stringify(filePath)});
-export default ${JSON.stringify(resUrl)};`
-}
-
-async function getResourceUrl(sourceFilePath: string) {
-    const config = getImportTransformConfig();
-
-    if (config && config.webSiteUrl) {
-        let fileExtension = path.extname(sourceFilePath);
-        let fileNameWithoutExt = path.basename(sourceFilePath).slice(0, -fileExtension.length);
-        let targetFileName = fileNameWithoutExt + '-' + getAssetsHash() + fileExtension;
-
-        return config.webSiteUrl + config.webResourcesRoot + targetFileName;
-    } else {
-        return sourceFilePath;
+    if (resUrlInfos.file) {
+        return `const __PATH__ = ${JSON.stringify(resUrlInfos.file)}; export default __PATH__;`
     }
+
+    return `const __URL__ = ${JSON.stringify(resUrlInfos.url)};
+if (global.jopiAddMappedUrl) global.jopiAddMappedUrl(${JSON.stringify(resUrlInfos.route)}, ${JSON.stringify(sourceFilePath)}, true);
+export default __URL__;`
 }
 
 async function transform_filePath(sourceFilePath: string) {
-    let resUrl = await getResourceUrl(sourceFilePath);
-    return `const __PATH__ = ${JSON.stringify(resUrl)}; export default __PATH__;`;
+    let resUrlInfos = await getResourceUrlInfos(sourceFilePath);
+
+    if (resUrlInfos.file) {
+        return `const __PATH__ = ${JSON.stringify(resUrlInfos.file)}; export default __PATH__;`
+    }
+
+    return `const __URL__ = ${JSON.stringify(resUrlInfos.url)};
+if (global.jopiAddMappedUrl) global.jopiAddMappedUrl(${JSON.stringify(resUrlInfos.route)}, ${JSON.stringify(sourceFilePath)}, false);
+export default __URL__;`;
 }
 
 async function transform_json(filePath: string) {
@@ -132,4 +129,22 @@ async function transform_inline(filePath: string) {
     }
 
     return `export default ${JSON.stringify(resText)};`
+}
+
+async function getResourceUrlInfos(sourceFilePath: string): Promise<{file?: string, route?: string, url?: string}> {
+    const config = getImportTransformConfig();
+
+    if (config && config.webSiteUrl) {
+        let route = path.relative(process.cwd(), sourceFilePath);
+        route = config.webResourcesRoot_SSR + nCrypto.md5(route) + path.extname(sourceFilePath);
+
+        return {
+            url: config.webSiteUrl + route,
+            route: "/" + route
+        };
+    }
+
+    return {
+        file: sourceFilePath
+    };
 }

@@ -100,6 +100,15 @@ export async function doNodeJsResolve(specifier: string, context: any, nextResol
 // noinspection JSUnusedGlobalSymbols
 export async function doNodeJsLoad(url: string, context: any, nextLoad: any) {
     if (context.format==="jopi-loader") {
+        // Some ".js" file can be found here, du to a strange bug
+        // inside the node.js loader, where the context object seems to be reused.
+        // It doesn't go through doNodeJsResolve and directly appears here.
+        //
+        if (!supportedExtensions.includes(path.extname(url))) {
+            context.format = "module";
+            return nextLoad(url, context);
+        }
+
         let idx = url.indexOf("?");
         let options = "";
 

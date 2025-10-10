@@ -11,10 +11,6 @@ const nFS = NodeSpace.fs;
 
 /**
  * Compile a CSS or SCSS file to a JavaScript file.
- *
- * --- Limitations ---
- * The current version doesn't support images and resources reference.
- * If a ref to an image / font / is embedded, then it will not be included.
  */
 export default async function compileCssModule(filePath: string): Promise<string> {
     // Occurs when it's compiled with TypeScript.

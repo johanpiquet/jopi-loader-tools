@@ -3,14 +3,20 @@ import * as sass from "sass";
 import fs from "node:fs/promises";
 import postcssModules from "postcss-modules";
 import postcss from "postcss";
+import postcssUrl from "postcss-url";
 
 import NodeSpace from "jopi-node-space";
+import {getVirtualUrlForFile} from "./virtualUrl.js";
 const nFS = NodeSpace.fs;
 
 /**
  * Compile a CSS or SCSS file to a JavaScript file.
+ *
+ * --- Limitations ---
+ * The current version doesn't support images and resources reference.
+ * If a ref to an image / font / is embedded, then it will not be included.
  */
-export default async function compileScss(filePath: string): Promise<string> {
+export default async function compileCssModule(filePath: string): Promise<string> {
     // Occurs when it's compiled with TypeScript.
     if (!await nFS.isFile(filePath)) {
         let source = NodeSpace.app.searchSourceOf(filePath)!;
@@ -34,8 +40,28 @@ export default async function compileScss(filePath: string): Promise<string> {
     // Process with PostCSS and css-modules
     let knownClassNames: Record<string, string> = {};
 
+    // Contains virtual urls for resources inside the CSS.
+    let virtualUrlSourceFiles: string[] = [];
+
     try {
         const plugins = [
+            // Will allow detecting internal url and replace url with a virtual url
+            // allowing to resolve the dependencies (from bundler or direct location).
+            //
+            postcssUrl({
+                url: (asset) => {
+                    if (asset.url.startsWith('/') || asset.url.startsWith('./')) {
+                        if (asset.absolutePath) {
+                            const virtualUrl = getVirtualUrlForFile(asset.absolutePath!);
+                            if (virtualUrl) virtualUrlSourceFiles.push(virtualUrl.sourceFile);
+                            if (virtualUrl) return virtualUrl.url;
+                        }
+                    }
+
+                    return asset.url;
+                }
+            }),
+
             postcssModules({
                 // The format of the classnames.
                 generateScopedName: '[name]__[local]',
@@ -65,7 +91,15 @@ export default async function compileScss(filePath: string): Promise<string> {
     // To known: we don't execute in the same process as the source code.
     // It's why we can't directly call registerCssModule.
 
-    return `export default ${JSON.stringify(knownClassNames)};`;
+    if (process.env.JOPI_BUNLDER_ESBUILD) {
+        return `export default ${JSON.stringify(knownClassNames)};`;
+    }
+
+    return `
+        const virtualUrls = ${JSON.stringify(virtualUrlSourceFiles)};
+        if (global.jopiAddVirtualUrlFor) virtualUrls.forEach(global.jopiAddVirtualUrlFor);
+        export default ${JSON.stringify(knownClassNames)};
+    `;
 }
 
 export function scssToCss(filePath: string): any {

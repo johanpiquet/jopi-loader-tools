@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 
 import NodeSpace from "jopi-node-space";
 import {getImportTransformConfig, INLINE_MAX_SIZE_KO} from "./config.ts";
+import {getVirtualUrlForFile} from "./virtualUrl.js";
 
 const nFS = NodeSpace.fs;
 const nCrypto = NodeSpace.crypto;
@@ -45,32 +46,40 @@ export async function transformFile(filePath: string, options: string): Promise<
     return {text, type: "js"};
 }
 
-async function transform_cssModule(filePath: string) {
-    return await cssModuleCompiler(filePath);
+async function transform_cssModule(sourceFilePath: string) {
+    return await cssModuleCompiler(sourceFilePath);
 }
 
 async function transform_css(sourceFilePath: string) {
-    let resUrlInfos = await getResourceUrlInfos(sourceFilePath);
+    let virtualUrl = getVirtualUrlForFile(sourceFilePath);
 
-    if (resUrlInfos.file) {
-        return `const __PATH__ = ${JSON.stringify(resUrlInfos.file)}; export default __PATH__;`
+    if (!virtualUrl?.url) {
+        return `const __PATH__ = ${JSON.stringify(virtualUrl?.sourceFile)}; export default __PATH__;`
     }
 
-    return `const __URL__ = ${JSON.stringify(resUrlInfos.url)};
-if (global.jopiAddMappedUrl) global.jopiAddMappedUrl(${JSON.stringify(resUrlInfos.route)}, ${JSON.stringify(sourceFilePath)}, true);
+    if (process.env.JOPI_BUNLDER_ESBUILD) {
+        return `const __URL__ = ${JSON.stringify(virtualUrl.url)}; export default __URL__;`
+    }
+
+    return `const __URL__ = ${JSON.stringify(virtualUrl.url)};
+if (global.jopiAddVirtualUrl) global.jopiAddVirtualUrl(${JSON.stringify(virtualUrl)}, true);
 export default __URL__;`
 }
 
 async function transform_filePath(sourceFilePath: string) {
-    let resUrlInfos = await getResourceUrlInfos(sourceFilePath);
+    let virtualUrl = getVirtualUrlForFile(sourceFilePath);
 
-    if (resUrlInfos.file) {
-        return `const __PATH__ = ${JSON.stringify(resUrlInfos.file)}; export default __PATH__;`
+    if (!virtualUrl?.url) {
+        return `const __PATH__ = ${JSON.stringify(virtualUrl?.sourceFile)}; export default __PATH__;`
     }
 
-    return `const __URL__ = ${JSON.stringify(resUrlInfos.url)};
-if (global.jopiAddMappedUrl) global.jopiAddMappedUrl(${JSON.stringify(resUrlInfos.route)}, ${JSON.stringify(sourceFilePath)}, false);
-export default __URL__;`;
+    if (process.env.JOPI_BUNLDER_ESBUILD) {
+        return `const __URL__ = ${JSON.stringify(virtualUrl.url)}; export default __URL__;`
+    }
+
+    return `const __URL__ = ${JSON.stringify(virtualUrl.url)};
+if (global.jopiAddVirtualUrl) global.jopiAddVirtualUrl(${JSON.stringify(virtualUrl)}, false);
+export default __URL__;`
 }
 
 async function transform_json(filePath: string) {
@@ -129,22 +138,4 @@ async function transform_inline(filePath: string) {
     }
 
     return `export default ${JSON.stringify(resText)};`
-}
-
-async function getResourceUrlInfos(sourceFilePath: string): Promise<{file?: string, route?: string, url?: string}> {
-    const config = getImportTransformConfig();
-
-    if (config && config.webSiteUrl) {
-        let route = path.relative(process.cwd(), sourceFilePath);
-        route = config.webResourcesRoot_SSR + nCrypto.md5(route) + path.extname(sourceFilePath);
-
-        return {
-            url: config.webSiteUrl + route,
-            route: "/" + route
-        };
-    }
-
-    return {
-        file: sourceFilePath
-    };
 }

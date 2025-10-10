@@ -7,3 +7,4 @@ export * from "./nodeJsLoader.js";
 
 export * from "./config.ts";
 export * from "./binaryTools.ts"
+export * from "./virtualUrl.ts"

@@ -6,7 +6,7 @@ import NodeSpace from "jopi-node-space";
 
 // *************************
 const FORCE_LOG = false;
-const VERSION = "v1.1.45";
+const VERSION = "20251011a";
 // *************************
 
 const nFS = NodeSpace.fs;
@@ -14,6 +14,7 @@ let mustLog = false; // Set env var JOPI_LOG to 1 to enable.
 
 interface WatchInfos {
     needWatch: boolean;
+    needUiWatch: boolean;
     needHot?: boolean;
 
     hasJopiWatchTask?: boolean;
@@ -23,14 +24,49 @@ interface WatchInfos {
     packageJsonFilePath?: string;
 }
 
-function checkIfDevMode() {
-    const idx = process.argv.indexOf("--jopi-dev");
+enum DevModType {
+    NONE = "none",
+    FULL_RELOAD = "full-reload",
+    UI_REBUILD = "ui-rebuild"
+}
+
+function getDevModeType(): DevModType {
+    let modFullReload = false;
+    let modUiRebuild = false;
+
+    //region Test jopi-dev
+
+    let idx = process.argv.indexOf("--jopi-dev");
+
     if (idx!==-1) {
         process.argv.splice(idx, 1);
-        return true;
+        modFullReload = true;
     }
 
-    return process.env.JOPI_DEV === "1";
+    if (process.env.JOPI_DEV === "1") {
+        modFullReload = true;
+    }
+
+    //endregion
+
+    //region Test jopi-dev-ui
+
+    idx = process.argv.indexOf("--jopi-dev-ui");
+
+    if (idx!==-1) {
+        process.argv.splice(idx, 1);
+        modUiRebuild = true;
+    }
+
+    if (process.env.JOPI_DEV_UI === "1") {
+        modUiRebuild = true;
+    }
+
+    //endregion
+
+    if (modUiRebuild) return DevModType.UI_REBUILD;
+    if (modFullReload) return DevModType.FULL_RELOAD;
+    return DevModType.NONE;
 }
 
 export async function jopiLauncherTool(jsEngine: string) {
@@ -88,8 +124,9 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     async function getConfiguration(): Promise<WatchInfos> {
         let res: WatchInfos = {
-            needWatch: gIsDevMode,
-            needHot: gIsDevMode && (jsEngine==="bun")
+            needUiWatch: gDevModeType === DevModType.UI_REBUILD,
+            needWatch: gDevModeType === DevModType.FULL_RELOAD,
+            needHot: (gDevModeType === DevModType.FULL_RELOAD) && (jsEngine==="bun")
         };
 
         let pckJson = NodeSpace.app.findPackageJson();
@@ -104,11 +141,11 @@ export async function jopiLauncherTool(jsEngine: string) {
                 let jopi: any = json["jopi"];
 
                 if (jopi) {
-                    if (jopi.watch===true) {
-                        // Force true, even for prod.
+                    if (jopi.needUiWatch===true) {
+                        res.needUiWatch = true;
+                    }
+                    else if (jopi.watch===true) {
                         res.needWatch = true;
-                    } else if (jopi.watch===false) {
-                        res.needWatch = false;
                     }
 
                     if (jopi.hot===true) {
@@ -157,8 +194,11 @@ export async function jopiLauncherTool(jsEngine: string) {
     const importFlag = jsEngine === "node" ? "--import" : "--preload";
 
     mustLog = process.env.JOPI_LOG==="1" || FORCE_LOG;
-    if (mustLog) console.log("Jopi version:", VERSION, " - engine:", jsEngine);
-    if (mustLog) console.log("Library @jopi-loader/tools found at", import.meta.dirname);
+
+    if (mustLog) {
+        console.log("JopiN version:", VERSION, " - engine:", jsEngine);
+        console.log("-> Library @jopi-loader/tools found at", import.meta.dirname);
+    }
 
     const knowPackagesToPreload = ["jopi-rewrite"];
 
@@ -186,7 +226,7 @@ export async function jopiLauncherTool(jsEngine: string) {
     }
 
     let cmd = NodeSpace.os.whichSync(jsEngine, jsEngine)!;
-    if (mustLog) console.log("Jopi - Using " + jsEngine + " from:", cmd);
+    if (mustLog) console.log("jopin - Using " + jsEngine + " from:", cmd);
     let args = [...preloadArgs, ...argv];
 
     let config = await getConfiguration();
@@ -207,13 +247,14 @@ export async function jopiLauncherTool(jsEngine: string) {
         return arg !== "--watch-path";
     });
 
-    let mustWatch = config.needWatch;
-
     const cwd = process.cwd();
     let env: Record<string, string> = {...process.env} as Record<string, string>;
 
-    if (mustWatch) {
-        env["JOPIN_SOURCE_WATCHING_ENABLED"] = "1";
+    if (config.needWatch || config.needUiWatch) {
+        //env["JOPIN_SOURCE_WATCHING_ENABLED"] = "1";
+
+        if (config.needWatch) env["JOPI_DEV"] = "1";
+        if (config.needUiWatch) env["JOPI_DEV_UI"] = "1";
 
         let wsUrl = await startWebSocket();
 
@@ -224,15 +265,23 @@ export async function jopiLauncherTool(jsEngine: string) {
 
         let toPrepend: string[] = [];
 
-        if (config.needHot) toPrepend.push("--hot");
-        else toPrepend.push("--watch");
+        if (config.needWatch) {
+            if (config.needHot) toPrepend.push("--hot");
+            else toPrepend.push("--watch");
 
-        args = [...toPrepend, ...args];
-        NodeSpace.term.logBlue("Source watching enabled.");
+            args = [...toPrepend, ...args];
+            NodeSpace.term.logBlue("JopiN - Full source watching enabled.");
+        }
+
+        if (config.needUiWatch) {
+            NodeSpace.term.logBlue("JopiN - UI source watching enabled.");
+        }
     }
 
-    if (mustLog) console.log("Jopi - Use current working dir:", cwd);
-    if (mustLog) console.log("Jopi - Executing:", cmd, ...args);
+    if (mustLog) {
+        console.log("jopin - Use current working dir:", cwd);
+        console.log("jopin - Executing:", cmd, ...args);
+    }
 
     let mainSpawnParams: SpawnParams =  {
         cmd, env, args, onSpawned, cwd: process.cwd(), killOnExit: false
@@ -240,7 +289,10 @@ export async function jopiLauncherTool(jsEngine: string) {
 
     spawnChild(mainSpawnParams);
 
-    if (gIsDevMode) {
+    // If dev-mode, then execute the scripts
+    // jopiWatch_node/jopiWatch_bun from package.json
+    //
+    if (gDevModeType === DevModType.FULL_RELOAD) {
         function execTask(taskName: string) {
             let cwd = path.dirname(config.packageJsonFilePath!);
             cmd = isNodeJs ? "npm" : "bun";
@@ -267,8 +319,8 @@ function killAll(signalName: NodeJS.Signals) {
     gToKill.forEach(child => {
         if (child.killed) return;
 
-        if (gIsDevMode) {
-            // > Do a fast hard kill.
+        if (gDevModeType!==DevModType.NONE) {
+            // > If dev-mode, directly do a fast hard kill.
             child.kill('SIGKILL');
             process.exit(0);
         } else {
@@ -369,20 +421,20 @@ async function startWebSocket(): Promise<string|undefined> {
 }
 
 function onWebSocketConnection(ws: WebSocket) {
-    if (mustLog) NodeSpace.term.logBgGreen("Client connected to web-socket")
+    if (mustLog) NodeSpace.term.logBgGreen("jopin - Client connected to web-socket")
     gWebSockets.push(ws);
 
     ws.onclose = (e) => {
         let idx = gWebSockets.indexOf(e.target);
         gWebSockets.splice(idx, 1);
 
-        if (mustLog) NodeSpace.term.logBgRed("Child process is restarting");
+        if (mustLog) NodeSpace.term.logBgRed("jopin - Client disconnected from web-socket");
         startWebSocket().catch();
     }
 
     ws.onmessage = (e) => {
         const msg = e.data;
-        if (mustLog) NodeSpace.term.logBlue("jopin websocket message received: ", msg);
+        if (mustLog) NodeSpace.term.logBlue("jopin - websocket message received: ", msg);
 
         switch (msg) {
             case "mustWaitServerReady":
@@ -404,7 +456,7 @@ function wsAskRefreshBrowser() {
     })
 }
 
-const gIsDevMode = checkIfDevMode();
+const gDevModeType = getDevModeType();
 const gToKill: ChildProcess[] = [];
 const gWebSockets: WebSocket[] = [];
 let gMustWaitServerReady: boolean = false;

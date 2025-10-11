@@ -52,7 +52,7 @@ export function findNodePackageEntryPoint(nodePackageDir: string): string {
  * @param packageName - The name of the module to find.
  * @return The path to the module directory if found, or null if not found.
  */
-export function finNodePackageDir(packageName: string): string|null {
+export function findNodePackageDir(packageName: string): string|null {
     let currentDir = process.cwd();
 
     while (true) {

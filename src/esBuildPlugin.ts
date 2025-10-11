@@ -85,7 +85,7 @@ export function installEsBuildPlugins(build: Bun.PluginBuilder) {
         }
 
         //@ts-ignore
-        return createJopiRawFile(result.path!, "css");
+        return createJopiRawFile(result.path!, "cssmodule");
     });
 
     // @ts-ignore
@@ -118,7 +118,7 @@ export function installEsBuildPlugins(build: Bun.PluginBuilder) {
                 return inlineAndRawModuleHandler("inline", filePath);
             case "option-raw":
                 return inlineAndRawModuleHandler("raw", filePath);
-            case "css":
+            case "cssmodule":
                 return processCssModule(filePath);
         }
     });
